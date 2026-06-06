@@ -19,7 +19,7 @@
 
 ### Deploy
 
-Push to `main` triggers `.github/workflows/deploy-pages.yml` (GitHub Pages). Ensure repo **Settings → Pages → Source: GitHub Actions**.
+Push to `main` triggers `.github/workflows/deploy-pages.yml` (GitHub Pages). **One-time:** repo owner must enable **Settings → Pages → Build and deployment → Source: GitHub Actions**. The workflow uses `enablement: true` but the token may lack permission to create the Pages site automatically.
 
 ### Gotchas
 
