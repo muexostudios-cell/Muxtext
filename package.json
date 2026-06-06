@@ -1,0 +1,22 @@
+{
+  "name": "workspace",
+  "version": "1.0.0",
+  "description": "A single-page browser text RPG built with plain HTML, CSS, and JavaScript.",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/muexostudios-cell/Muxtext.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/muexostudios-cell/Muxtext/issues"
+  },
+  "homepage": "https://github.com/muexostudios-cell/Muxtext#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.60.0"
+  }
+}
