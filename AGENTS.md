@@ -15,7 +15,16 @@
 
 - Edit **`index.html`** for game changes
 - `README.md` is project documentation only
-- No package manager, build step, or test suite
+- No build step or bundler — static `index.html` served as-is
+- **Dev server:** `python3 -m http.server 8000` → http://localhost:8000/
+- **Tests:** `npm install` then `npx playwright install chromium` (first time only), then `npm test`
+- **Lint:** none configured (no ESLint/Prettier in repo)
+
+### Cloud agent startup
+
+1. `python3 -m http.server 8000` (tmux or background) for browser testing at http://localhost:8000/
+2. Outbound network required for Gun.js CDN + `https://gun.o8.is/gun` (account register/login blocks until relay is ready)
+3. Playwright smoke test uses fixed username `smoke_test`; if that account already exists on Gun cloud, registration fails — use a unique username for manual hello-world demos
 
 ### Hello-world smoke test
 
