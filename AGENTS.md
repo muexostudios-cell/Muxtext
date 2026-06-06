@@ -2,44 +2,40 @@
 
 ## Cursor Cloud specific instructions
 
-### Product overview
+### Product
 
-**MUX text-rpg · 文字地城** is a single-file, client-side browser game. The entire application lives in `README.md` (valid HTML). There is no backend, build step, package manager, test suite, or linter.
+**MUX text-rpg · 文字地城** — browser text RPG. Canonical game source is `index.html` (not README.md).
 
-### Running the game locally
+### Play URL
 
-1. Copy the game file for HTTP serving (browsers handle `localStorage` more reliably over HTTP than `file://`):
-   ```bash
-   cp README.md index.html
-   python3 -m http.server 8000
-   ```
-2. Open `http://localhost:8000/index.html` in a modern browser (Chrome/Firefox).
+- Production: https://muexostudios-cell.github.io/Muxtext/
+- Local: `python3 -m http.server 8000` → http://localhost:8000/
 
-Alternatively, open `README.md` directly in a browser via `xdg-open README.md` (offline, no server).
+### Development
+
+- Edit **`index.html`** for game changes
+- `README.md` is project documentation only
+- No package manager, build step, or test suite
 
 ### Hello-world smoke test
 
-1. Enter a player name on the welcome overlay and confirm.
+1. Log in or register on the account overlay.
 2. Click **> 地城** (`#btn-dungeon`).
 3. Pick an available level (e.g. Lv.1–3), choose **普通** (normal), then **手動戰鬥** (manual) if the drone prompt appears.
 4. Click an adjacent map cell to move or start combat.
 
-### Services
+### Deploy
 
-| Service | Required? | Notes |
-|---------|-----------|-------|
-| Static HTTP server | Optional but recommended | `python3 -m http.server 8000` after copying to `index.html` |
-| Web browser | Required | Game runs entirely in the browser |
-| Database / Docker / Node | No | Not used |
-
-### Lint / test / build
-
-None configured. No `npm`, `make`, or CI targets exist in this repository.
+Push to `main` triggers `.github/workflows/deploy-pages.yml` (GitHub Pages). **One-time:** repo owner must enable **Settings → Pages → Build and deployment → Source: GitHub Actions**. The workflow uses `enablement: true` but the token may lack permission to create the Pages site automatically.
 
 ### Gotchas
 
-- **`index.html` is a dev convenience copy** of `README.md`; it is not tracked in git. Regenerate with `cp README.md index.html` after pulling changes to `README.md`.
-- **New players** must use the top quick button `> 地城` (`#btn-dungeon`), not unrelated sidebar UI if testing in a generic browser layout.
-- **Drone overlay**: when the player has a living drone, entering a normal dungeon shows a choice between drone auto-battle and manual combat; pick **手動戰鬥** for interactive testing.
-- **Persistence**: saves use `localStorage` keys (`td_full_save`, `td_settings`, `td_lang`, etc.). Clear site data in DevTools for a clean run.
-- **Debug hook**: `window.repairDrone` is exposed globally for drone repair during development.
+- Gun.js chat requires network; game core works offline after first load
+- Desktop layout activates at width ≥ 900px
+- Mobile chat: **> 聊天室** tab between 裝備 and 背包 opens `#chat-overlay`
+- Account saves: `td_accounts_v1` (local), `td_session` (active login)
+- Cloud accounts: Gun.js `muxtext-cloud-v1/accounts/{key}` (AES-GCM encrypted, E2E)
+- Cloud sync requires login each browser session (password held in memory only)
+- Legacy keys (pre-account): `td_full_save`, `td_player_name`, `td_avatar`
+- Global: `td_settings`, `td_lang`
+- **Debug hook**: `window.repairDrone` is exposed globally for drone repair during development
