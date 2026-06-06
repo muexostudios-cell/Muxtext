@@ -28,11 +28,25 @@ python3 -m http.server 8000
 
 開啟 http://localhost:8000/ 或 http://localhost:8000/index.html
 
+## 測試
+
+瀏覽器煙霧測試使用 Playwright：
+
+```bash
+npm install
+npx playwright install chromium
+npm test
+```
+
+測試會註冊帳號、進入地城並驗證地圖渲染與按鈕不超出視窗。
+
 ## 專案結構
 
 | 檔案 | 說明 |
 |------|------|
 | `index.html` | 遊戲主程式（唯一需要修改的遊戲原始碼） |
+| `tests/smoke.spec.js` | Playwright 瀏覽器煙霧測試 |
+| `package.json` | 測試腳本與開發依賴 |
 | `.github/workflows/deploy-pages.yml` | 自動部署至 GitHub Pages |
 
 ## 部署
