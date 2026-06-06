@@ -25,4 +25,6 @@ Push to `main` triggers `.github/workflows/deploy-pages.yml` (GitHub Pages). **O
 
 - Gun.js chat requires network; game core works offline after first load
 - Desktop layout activates at width ≥ 900px
-- `localStorage` keys: `td_full_save`, `td_settings`, `td_lang`, etc.
+- Account saves: `td_accounts_v1` (per-account game data), `td_session` (active login)
+- Legacy keys (pre-account): `td_full_save`, `td_player_name`, `td_avatar`
+- Global: `td_settings`, `td_lang`
