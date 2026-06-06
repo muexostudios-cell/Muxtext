@@ -24,20 +24,36 @@ async function expectControlsWithinViewport(page, selectors) {
   expect(overflowing).toEqual([]);
 }
 
+async function completeBootAndRegister(page) {
+  await expect(page.locator('#loading-overlay')).toBeVisible();
+  await expect(page.locator('#account-overlay')).toBeVisible({ timeout: 10000 });
+
+  await page.locator('#account-tab-register').click();
+  await page.locator('#account-username').fill('smoke_test');
+  await page.locator('#account-password').fill('test1234');
+  await page.locator('#account-password-confirm').fill('test1234');
+  await page.locator('#account-display-input').fill('SmokeTester');
+  await page.locator('#account-submit').click();
+
+  await expect(page.locator('#account-overlay')).toBeHidden({ timeout: 15000 });
+  await expect(page.locator('#player-name-custom')).toHaveText('SmokeTester');
+}
+
 test('starts a manual dungeon run and renders the map', async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.clear();
-    localStorage.setItem('td_player_name', 'SmokeTester');
   });
 
   await page.goto(pathToFileURL(path.join(__dirname, '..', 'index.html')).href);
 
   await expect(page).toHaveTitle(/MUX text-rpg/);
-  await expect(page.locator('#player-name-custom')).toHaveText('SmokeTester');
+  await completeBootAndRegister(page);
+
   await expectControlsWithinViewport(page, [
     '#btn-settings',
     '#quick-btns button',
     '#tab-bar button',
+    '#btn-chat',
     '#action-bar button',
   ]);
 
@@ -53,5 +69,5 @@ test('starts a manual dungeon run and renders the map', async ({ page }) => {
   await page.locator('#drone-dungeon-no').click();
   await expect(page.locator('#map .cell')).toHaveCount(49);
   await expect(page.locator('#map-container')).toBeVisible();
-  await expectControlsWithinViewport(page, ['#action-bar button', '#tab-bar button']);
+  await expectControlsWithinViewport(page, ['#action-bar button', '#tab-bar button', '#btn-chat']);
 });
