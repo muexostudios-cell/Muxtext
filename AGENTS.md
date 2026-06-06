@@ -25,6 +25,8 @@ Push to `main` triggers `.github/workflows/deploy-pages.yml` (GitHub Pages). **O
 
 - Gun.js chat requires network; game core works offline after first load
 - Desktop layout activates at width ≥ 900px
-- Account saves: `td_accounts_v1` (per-account game data), `td_session` (active login)
+- Account saves: `td_accounts_v1` (local), `td_session` (active login)
+- Cloud accounts: Gun.js `muxtext-cloud-v1/accounts/{key}` (AES-GCM encrypted, E2E)
+- Cloud sync requires login each browser session (password held in memory only)
 - Legacy keys (pre-account): `td_full_save`, `td_player_name`, `td_avatar`
 - Global: `td_settings`, `td_lang`
