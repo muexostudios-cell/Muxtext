@@ -11,6 +11,8 @@
 const MAX_MESSAGES = 100;
 const MAX_TEXT = 200;
 const MAX_USER = 32;
+const MAX_LEVEL = 99999;
+const MAX_PROFILE_BYTES = 12000;
 const SEND_COOLDOWN_MS = 1500;
 
 const CORS_HEADERS = {
@@ -36,6 +38,28 @@ function json(data, status = 200) {
       headers: { 'Content-Type': 'application/json' },
     })
   );
+}
+
+function sanitizeLevel(value) {
+  const n = parseInt(value, 10);
+  if (!Number.isFinite(n) || n < 1) return null;
+  return Math.min(n, MAX_LEVEL);
+}
+
+function sanitizeProfile(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  let serialized;
+  try {
+    serialized = JSON.stringify(raw);
+  } catch {
+    return null;
+  }
+  if (!serialized || serialized.length > MAX_PROFILE_BYTES) return null;
+  try {
+    return JSON.parse(serialized);
+  } catch {
+    return null;
+  }
 }
 
 export class ChatRoom {
@@ -83,12 +107,17 @@ export class ChatRoom {
         return json({ error: 'empty' }, 400);
       }
 
+      const level = sanitizeLevel(body.level);
+      const profile = sanitizeProfile(body.profile);
+
       const msg = {
         id: crypto.randomUUID(),
         user,
         text,
         time: Date.now(),
       };
+      if (level != null) msg.level = level;
+      if (profile) msg.profile = profile;
 
       await this.addMessage(msg);
       this.broadcast({ type: 'message', data: msg });
