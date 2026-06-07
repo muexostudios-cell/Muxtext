@@ -3,7 +3,7 @@
  * Deploy with Wrangler; set STRIPE_SECRET_KEY (sk_live_...) as a secret.
  *
  *   cd workers/stripe-verify
- *   npx wrangler secret put STRIPE_SECRET_KEY
+ *   npx wrangler secret put STRIPE_SECRET_KEY   # sk_live_... or rk_live_...
  *   npx wrangler deploy
  */
 const PACKAGE_CATALOG = {
