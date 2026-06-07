@@ -6,11 +6,26 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 CHAT_DIR="$ROOT/workers/chat"
 INDEX="$ROOT/index.html"
 
+if [[ -f "$ROOT/.env" ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source "$ROOT/.env"
+  set +a
+fi
+
 if [[ -z "${CLOUDFLARE_API_TOKEN:-}" ]]; then
   echo "Missing CLOUDFLARE_API_TOKEN."
   echo "Create at: https://dash.cloudflare.com/profile/api-tokens"
   echo "Required permissions: Account / Workers Scripts / Edit, Durable Objects / Edit"
+  echo ""
+  echo "Then either:"
+  echo "  cp .env.example .env   # fill in values"
+  echo "  CLOUDFLARE_API_TOKEN=... CLOUDFLARE_ACCOUNT_ID=... bash tools/deploy-chat-worker.sh"
   exit 1
+fi
+
+if [[ -n "${CLOUDFLARE_ACCOUNT_ID:-}" ]]; then
+  export CLOUDFLARE_ACCOUNT_ID
 fi
 
 cd "$CHAT_DIR"
