@@ -46,20 +46,95 @@ function sanitizeLevel(value) {
   return Math.min(n, MAX_LEVEL);
 }
 
+const PROFILE_RARITIES = new Set(['common', 'rare', 'epic', 'legendary', 'hidden']);
+
+function clampInt(value, min, max, fallback = 0) {
+  const n = parseInt(value, 10);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, n));
+}
+
+function sanitizeAvatarUrl(url) {
+  if (!url || typeof url !== 'string') return '';
+  const trimmed = url.trim();
+  if (!trimmed.startsWith('data:image/') || trimmed.length > 12000) return '';
+  return trimmed;
+}
+
+function sanitizeEquipItem(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const affixes = Array.isArray(raw.affixes)
+    ? raw.affixes.slice(0, 8).map((a) => ({
+        stat: String(a?.stat || '').slice(0, 24),
+        value: Number(a?.value) || 0,
+      }))
+    : [];
+  return {
+    name: String(raw.name || '').slice(0, 40),
+    rarity: PROFILE_RARITIES.has(raw.rarity) ? raw.rarity : 'common',
+    type: String(raw.type || '').slice(0, 16),
+    level: clampInt(raw.level, 1, MAX_LEVEL, 1),
+    upgradeLv: clampInt(raw.upgradeLv, 0, 99, 0),
+    baseStat: String(raw.baseStat || '').slice(0, 24),
+    baseValue: Number(raw.baseValue) || 0,
+    affixes,
+  };
+}
+
 function sanitizeProfile(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+
+  const profile = {
+    n: String(raw.n || raw.name || '???').slice(0, MAX_USER),
+    lv: clampInt(raw.lv ?? raw.level, 1, MAX_LEVEL, 1),
+    g: Math.max(0, clampInt(raw.g ?? raw.gold, 0, 999999999, 0)),
+    c: Math.max(0, clampInt(raw.c ?? raw.chips, 0, 999999999, 0)),
+    cl: clampInt(raw.cl ?? raw.craftLevel, 1, MAX_LEVEL, 1),
+    dl: clampInt(raw.dl ?? raw.droneIdleLevel, 1, MAX_LEVEL, 1),
+    md: Math.min(100, Math.max(0, Number(raw.md ?? raw.memoryDecay) || 0)),
+    atk: Math.max(0, clampInt(raw.atk, 0, 999999, 0)),
+    def: Math.max(0, clampInt(raw.def, 0, 999999, 0)),
+    hp: Math.max(0, clampInt(raw.hp, 0, 999999, 0)),
+    spd: Math.max(0, clampInt(raw.spd, 0, 999999, 0)),
+    crit: Math.max(0, clampInt(raw.crit, 0, 100, 0)),
+    dodge: Math.max(0, clampInt(raw.dodge, 0, 100, 0)),
+    talents: {},
+    equip: {},
+    st: {},
+  };
+
+  const avatar = sanitizeAvatarUrl(raw.av || raw.avatar);
+  if (avatar) profile.av = avatar;
+
+  if (raw.talents && typeof raw.talents === 'object') {
+    for (const key of Object.keys(raw.talents).slice(0, 12)) {
+      profile.talents[key] = Math.max(0, clampInt(raw.talents[key], 0, 9999, 0));
+    }
+  }
+
+  if (raw.equip && typeof raw.equip === 'object') {
+    for (const slot of Object.keys(raw.equip).slice(0, 12)) {
+      const item = sanitizeEquipItem(raw.equip[slot]);
+      if (item) profile.equip[slot] = item;
+    }
+  }
+
+  const stats = raw.st || raw.stats || {};
+  profile.st = {
+    ca: clampInt(stats.ca ?? stats.createdAt, 0, 9999999999999, 0),
+    pt: Math.max(0, clampInt(stats.pt ?? stats.totalPlaytime, 0, 999999999, 0)),
+    dc: Math.max(0, clampInt(stats.dc ?? stats.dungeonClears, 0, 999999999, 0)),
+    dk: Math.max(0, clampInt(stats.dk ?? stats.dungeonKills, 0, 999999999, 0)),
+  };
+
   let serialized;
   try {
-    serialized = JSON.stringify(raw);
+    serialized = JSON.stringify(profile);
   } catch {
     return null;
   }
   if (!serialized || serialized.length > MAX_PROFILE_BYTES) return null;
-  try {
-    return JSON.parse(serialized);
-  } catch {
-    return null;
-  }
+  return profile;
 }
 
 export class ChatRoom {
