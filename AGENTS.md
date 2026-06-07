@@ -39,3 +39,11 @@ Push to `main` triggers `.github/workflows/deploy-pages.yml` (GitHub Pages). **O
 - Legacy keys (pre-account): `td_full_save`, `td_player_name`, `td_avatar`
 - Global: `td_settings`, `td_lang`
 - **Debug hook**: `window.repairDrone` is exposed globally for drone repair during development
+
+### Stripe live payments
+
+- Config in `index.html`: `PAYMENT_CONFIG` (`mode`, `pkLive`, `pkTest`, `verifyEndpoint`)
+- Localhost auto-uses **test** keys/links; production uses **live**
+- Create live Payment Links: `STRIPE_SECRET_KEY=sk_live_... node tools/setup-stripe-payment-links.mjs --mode live --write-index`
+- Deploy verify worker: `workers/stripe-verify/` (Wrangler + `STRIPE_SECRET_KEY` secret), then set `verifyEndpoint` to the worker URL
+- Never commit `sk_live_` / `sk_test_` to the repo
