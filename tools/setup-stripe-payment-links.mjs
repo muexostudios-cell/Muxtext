@@ -7,11 +7,17 @@
 const SECRET = process.env.STRIPE_SECRET_KEY;
 const SUCCESS_BASE = process.env.STRIPE_SUCCESS_BASE || 'https://muexostudios-cell.github.io/Muxtext/';
 
+const CHIP_RATE = 1280 / 148; // chips per HKD from top existing tier
+
 const PACKAGES = [
   { id: 'chip60', chips: 60, priceHkd: 8 },
   { id: 'chip300', chips: 300, priceHkd: 38 },
   { id: 'chip680', chips: 680, priceHkd: 78 },
   { id: 'chip1280', chips: 1280, priceHkd: 148 },
+  { id: 'chip1712', chips: Math.round(198 * CHIP_RATE), priceHkd: 198 },
+  { id: 'chip2837', chips: Math.round(328 * CHIP_RATE), priceHkd: 328 },
+  { id: 'chip3875', chips: Math.round(448 * CHIP_RATE), priceHkd: 448 },
+  { id: 'chip5604', chips: Math.round(648 * CHIP_RATE), priceHkd: 648 },
 ];
 
 if (!SECRET) {
