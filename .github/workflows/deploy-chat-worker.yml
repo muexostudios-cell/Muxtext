@@ -28,14 +28,32 @@ jobs:
           node-version: '20'
 
       - name: Deploy Cloudflare Worker
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy
-          workingDirectory: workers/chat
+        id: deploy
+        working-directory: workers/chat
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -e
+          npx wrangler deploy 2>&1 | tee /tmp/wrangler-chat-deploy.log
+          URL=$(grep -oE 'https://muxtext-chat\.[a-zA-Z0-9.-]+\.workers\.dev' /tmp/wrangler-chat-deploy.log | head -1 || true)
+          if [ -z "$URL" ]; then
+            URL=$(grep -oE 'https://[a-zA-Z0-9.-]+\.workers\.dev' /tmp/wrangler-chat-deploy.log | grep muxtext-chat | head -1 || true)
+          fi
+          if [ -n "$URL" ]; then
+            echo "worker_url=$URL" >> "$GITHUB_OUTPUT"
+            echo "Deployed chat worker: $URL"
+          else
+            echo "::warning::Deploy succeeded but workers.dev URL was not found in wrangler output"
+          fi
 
       - name: Worker URL hint
         run: |
-          echo "After success, set CHAT_CONFIG.endpoint in index.html to:"
-          echo "https://muxtext-chat.<your-subdomain>.workers.dev"
+          URL="${{ steps.deploy.outputs.worker_url }}"
+          if [ -n "$URL" ]; then
+            echo "Set CHAT_CONFIG.endpoint in index.html to:"
+            echo "$URL"
+            echo "Or run locally: CLOUDFLARE_API_TOKEN=... bash tools/deploy-chat-worker.sh"
+          else
+            echo "Check Cloudflare dashboard → Workers → muxtext-chat for the workers.dev URL"
+          fi
