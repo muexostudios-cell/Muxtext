@@ -42,8 +42,12 @@ Push to `main` triggers `.github/workflows/deploy-pages.yml` (GitHub Pages). **O
 
 ### Stripe live payments
 
-- Config in `index.html`: `PAYMENT_CONFIG` (`mode`, `pkLive`, `pkTest`, `verifyEndpoint`)
+- Config in `index.html`: `PAYMENT_CONFIG` (`mode`, `pkLive`, `pkTest`, `verifyEndpoint`, `allowLiveTrustRedirect`)
 - Localhost auto-uses **test** keys/links; production uses **live**
 - Create live Payment Links: `STRIPE_SECRET_KEY=sk_live_... node tools/setup-stripe-payment-links.mjs --mode live --write-index`
-- Deploy verify worker: `workers/stripe-verify/` (Wrangler + `STRIPE_SECRET_KEY` secret), then set `verifyEndpoint` to the worker URL
-- Never commit `sk_live_` / `sk_test_` to the repo
+- **Deploy verify worker** (pick one):
+  1. **GitHub Actions** — repo Settings → Secrets → add `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `STRIPE_SECRET_KEY` (`rk_live_` or `sk_live_`), then run workflow *Deploy Stripe Verify Worker*
+  2. **Local Wrangler** — `CLOUDFLARE_API_TOKEN=... STRIPE_SECRET_KEY=rk_live_... bash tools/deploy-stripe-verify.sh`
+  3. **Vercel** — connect repo, set `STRIPE_SECRET_KEY`, use `https://<project>.vercel.app/api/stripe-verify` as `verifyEndpoint`
+- After deploy: set `verifyEndpoint` to worker/API URL and `allowLiveTrustRedirect: false`
+- Never commit `sk_live_` / `rk_live_` to the repo (`pk_live_` is public)

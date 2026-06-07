@@ -1,0 +1,33 @@
+name: Deploy Stripe Verify Worker
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'workers/stripe-verify/**'
+      - '.github/workflows/deploy-stripe-worker.yml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Deploy Cloudflare Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy
+          workingDirectory: workers/stripe-verify
+          secrets: |
+            STRIPE_SECRET_KEY
+        env:
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
