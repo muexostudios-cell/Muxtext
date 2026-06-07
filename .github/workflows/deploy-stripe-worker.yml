@@ -16,6 +16,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Check Cloudflare secrets
+        run: |
+          if [ -z "${{ secrets.CLOUDFLARE_API_TOKEN }}" ] || [ -z "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}" ]; then
+            echo "::error::Add CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID in repo Settings → Secrets → Actions"
+            exit 1
+          fi
+
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -27,7 +34,17 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy
           workingDirectory: workers/stripe-verify
-          secrets: |
-            STRIPE_SECRET_KEY
+
+      - name: Set Stripe secret on Worker
+        if: ${{ secrets.STRIPE_SECRET_KEY != '' }}
+        working-directory: workers/stripe-verify
         env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+        run: printf '%s' "$STRIPE_SECRET_KEY" | npx wrangler secret put STRIPE_SECRET_KEY
+
+      - name: Worker URL hint
+        run: |
+          echo "After success, verifyEndpoint is typically:"
+          echo "https://muxtext-stripe-verify.<your-subdomain>.workers.dev"
