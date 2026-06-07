@@ -1,0 +1,29 @@
+#!/usr/bin/env python3
+"""Replace Gun.js chat with independent REST/WebSocket chat backend."""
+from pathlib import Path
+
+path = Path('/workspace/index.html')
+c = path.read_text(encoding='utf-8')
+
+replacements = [
+    (
+        "const seenChatIds=new Set();let chatGun=null,chatRoom=null,chatReady=false,chatStatusMode='loading',chatLazyBound=false,chatFlushPending=false,chatBatchQueue=[],lastChatSendAt=0;const CHAT_SEND_COOLDOWN_MS=1500,CHAT_HISTORY_MS=172800000,SEEN_CHAT_MAX=400;",
+        "const CHAT_CONFIG={endpoint:'',pollIntervalMs:5000};const seenChatIds=new Set();let chatWs=null,chatPollTimer=null,chatConnecting=false,lastChatPollAt=0,chatReady=false,chatStatusMode='loading',chatLazyBound=false,chatFlushPending=false,chatBatchQueue=[],lastChatSendAt=0;const CHAT_SEND_COOLDOWN_MS=1500,CHAT_HISTORY_MS=172800000,SEEN_CHAT_MAX=400;",
+    ),
+    (
+        "function loadGunScript(cb){if(typeof Gun!=='undefined'){cb();return;}const urls=['https://cdn.jsdelivr.net/npm/gun/gun.js','https://unpkg.com/gun/gun.js'];let i=0;const tryNext=()=>{if(i>=urls.length){updateChatStatus('offline');return;}const s=document.createElement('script');s.src=urls[i++];s.onload=cb;s.onerror=tryNext;document.head.appendChild(s);};tryNext();}function initChat(){if(chatReady)return;updateChatStatus('loading');loadGunScript(()=>{try{ensureGameGun(gun=>{chatGun=gun;chatRoom=chatGun.get('muxtext-nightcity-chat-v1').get('global');chatRoom.map().on((data,id)=>{if(!data||!data.text||!id)return;if(seenChatIds.has(id))return;if(data.time&&data.time<Date.now()-CHAT_HISTORY_MS)return;seenChatIds.add(id);trimSeenChatIds();queueChatMessage(data);});chatReady=true;updateChatStatus('online');});}catch(e){updateChatStatus('offline');}});}function sendChatMessage(){const input=document.getElementById('chat-input');if(!input)return;const text=input.value.trim();if(!text)return;if(Date.now()-lastChatSendAt<CHAT_SEND_COOLDOWN_MS)return;lastChatSendAt=Date.now();if(!chatReady||!chatRoom){appendChatMessage({user:playerCustomName||'PLAYER',text,time:Date.now()});input.value='';updateChatStatus('offline');return;}const id=(typeof Gun!=='undefined'&&Gun.text&&Gun.text.random)?Gun.text.random(16):Date.now().toString(36)+Math.random().toString(36).slice(2,8);const msg={user:playerCustomName||'PLAYER',text,time:Date.now()};seenChatIds.add(id);chatRoom.get(id).put(msg);appendChatMessage(msg);input.value='';}",
+        "function loadGunScript(cb){if(typeof Gun!=='undefined'){cb();return;}const urls=['https://cdn.jsdelivr.net/npm/gun/gun.js','https://unpkg.com/gun/gun.js'];let i=0;const tryNext=()=>{if(i>=urls.length){cb(new Error('gun_load_failed'));return;}const s=document.createElement('script');s.src=urls[i++];s.onload=()=>cb();s.onerror=tryNext;document.head.appendChild(s);};tryNext();}function getChatEndpoint(){return (CHAT_CONFIG.endpoint||'').replace(/\\/$/,'');}function stopChatPoll(){if(chatPollTimer){clearInterval(chatPollTimer);chatPollTimer=null;}}function ingestChatMessages(list){if(!list||!list.length)return;list.forEach(m=>{if(!m||!m.text||!m.id)return;if(seenChatIds.has(m.id))return;if(m.time&&m.time<Date.now()-CHAT_HISTORY_MS)return;seenChatIds.add(m.id);trimSeenChatIds();queueChatMessage(m);if(m.time>lastChatPollAt)lastChatPollAt=m.time;});}function connectChatWs(base){if(chatWs&&chatWs.readyState<=1)return;try{const wsUrl=(base.replace(/^http/,'ws'))+'/ws';chatWs=new WebSocket(wsUrl);chatWs.onmessage=(ev)=>{try{const p=JSON.parse(ev.data);if(p.type==='message'&&p.data)ingestChatMessages([p.data]);}catch(e){}};chatWs.onopen=()=>{stopChatPoll();};chatWs.onclose=()=>{chatWs=null;if(chatReady){const ep=getChatEndpoint();if(ep)startChatPoll(ep);}};chatWs.onerror=()=>{};}catch(e){startChatPoll(base);}}function startChatPoll(base){if(chatPollTimer||!base)return;const poll=()=>{if(!chatReady)return;fetch(base+'/messages?after='+lastChatPollAt).then(r=>r.ok?r.json():null).then(data=>{if(data&&data.messages)ingestChatMessages(data.messages);}).catch(()=>{});};poll();chatPollTimer=setInterval(poll,CHAT_CONFIG.pollIntervalMs||5000);}function initChat(){if(chatReady||chatConnecting)return;const base=getChatEndpoint();if(!base){updateChatStatus('offline');return;}chatConnecting=true;updateChatStatus('loading');fetch(base+'/messages?limit=50').then(r=>{if(!r.ok)throw new Error('fetch');return r.json();}).then(data=>{ingestChatMessages(data.messages||[]);chatReady=true;chatConnecting=false;updateChatStatus('online');connectChatWs(base);}).catch(()=>{chatConnecting=false;updateChatStatus('offline');});}function sendChatMessage(){const input=document.getElementById('chat-input');if(!input)return;const text=input.value.trim();if(!text)return;if(Date.now()-lastChatSendAt<CHAT_SEND_COOLDOWN_MS)return;lastChatSendAt=Date.now();const base=getChatEndpoint();const user=playerCustomName||'PLAYER';if(!base||!chatReady){appendChatMessage({user,text,time:Date.now()});input.value='';updateChatStatus('offline');return;}fetch(base+'/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user,text})}).then(r=>r.json()).then(data=>{if(data&&data.message)ingestChatMessages([data.message]);input.value='';}).catch(()=>{appendChatMessage({user,text,time:Date.now()});input.value='';updateChatStatus('offline');});}",
+    ),
+    (
+        "GAME_VERSION='2.3',GAME_VERSION_HISTORY=[{version:'2.3'",
+        "GAME_VERSION='2.4',GAME_VERSION_HISTORY=[{version:'2.4',date:'2025-06-07',summary:{zh:'獨立聊天後端：Cloudflare Worker + WebSocket，脫離 Gun.js 聊天以降低多玩家卡頓。',en:'Independent chat backend via Cloudflare Worker + WebSocket, replacing Gun.js chat.'}},{version:'2.3'",
+    ),
+]
+
+for i, (old, new) in enumerate(replacements):
+    if old not in c:
+        raise SystemExit(f'MISSING patch {i}: {old[:80]}...')
+    c = c.replace(old, new, 1)
+
+path.write_text(c, encoding='utf-8')
+print('Applied chat backend patches')
