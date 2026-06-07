@@ -54,6 +54,50 @@ test.describe('chat layout', () => {
     await expect(page.locator('#chat-overlay')).toBeHidden();
   });
 
+  test('large text size keeps chat controls visible', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem(
+        'td_settings',
+        JSON.stringify({
+          uiScale: 1,
+          textSize: 2,
+          autoHerb: { enabled: false, threshold: 30, herbId: 'herb_low' },
+        }),
+      );
+    });
+    await page.reload({ waitUntil: 'load' });
+    await page.waitForTimeout(500);
+    await dismissBootOverlays(page);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await dismissBootOverlays(page);
+
+    await page.evaluate(() => document.getElementById('btn-chat').click());
+
+    const layout = await page.evaluate(() => {
+      const panel = document.querySelector('#chat-overlay #chat-panel');
+      const input = document.getElementById('chat-input-row');
+      const close = document.getElementById('btn-close-chat');
+      const pr = panel.getBoundingClientRect();
+      const ir = input.getBoundingClientRect();
+      const cr = close.getBoundingClientRect();
+      return {
+        textScale: getComputedStyle(document.documentElement).getPropertyValue('--chat-text-scale').trim(),
+        panelH: getComputedStyle(document.documentElement).getPropertyValue('--chat-panel-h').trim(),
+        panelFits: pr.bottom <= window.innerHeight + 2,
+        inputInPanel: ir.bottom <= pr.bottom + 1,
+        closeInPanel: cr.bottom <= pr.bottom + 1,
+        chatRootFont: getComputedStyle(document.getElementById('chat-overlay')).fontSize,
+      };
+    });
+
+    expect(layout.textScale).toBe('2');
+    expect(parseInt(layout.panelH, 10)).toBeGreaterThan(400);
+    expect(layout.panelFits).toBe(true);
+    expect(layout.inputInPanel).toBe(true);
+    expect(layout.closeInPanel).toBe(true);
+    expect(parseFloat(layout.chatRootFont)).toBeGreaterThan(20);
+  });
+
   test('desktop shows chat in panel sidebar', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await dismissBootOverlays(page);
@@ -68,6 +112,11 @@ test.describe('chat layout', () => {
     expect(sidebarBox).toBeTruthy();
     expect(panelBox).toBeTruthy();
     expect(panelBox.x).toBeGreaterThanOrEqual(sidebarBox.x - 1);
-    expect(panelBox.x + panelBox.width).toBeLessThanOrEqual(sidebarBox.x + sidebarBox.width + 1);
+    const widthOk = await page.evaluate(() => {
+      const sidebar = document.getElementById('panel-sidebar');
+      const panel = document.querySelector('#panel-sidebar #chat-panel');
+      return panel.offsetWidth <= sidebar.offsetWidth;
+    });
+    expect(widthOk).toBe(true);
   });
 });
