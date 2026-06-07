@@ -45,9 +45,10 @@ new = re.sub(
     count=1,
 )
 if new == text:
-    raise SystemExit('Could not update CHAT_CONFIG.endpoint in index.html')
-open(path, 'w', encoding='utf-8').write(new)
-print(f'Updated CHAT_CONFIG.endpoint in {path}')
+    print(f'CHAT_CONFIG.endpoint already set to {url}')
+else:
+    open(path, 'w', encoding='utf-8').write(new)
+    print(f'Updated CHAT_CONFIG.endpoint in {path}')
 PY
 
 echo ""
