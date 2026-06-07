@@ -98,6 +98,23 @@ test.describe('chat layout', () => {
     expect(parseFloat(layout.chatRootFont)).toBeGreaterThan(20);
   });
 
+  test('mobile chat stays open when viewport resizes', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await dismissBootOverlays(page);
+
+    await page.evaluate(() => document.getElementById('btn-chat').click());
+    await expect(page.locator('#chat-overlay')).toHaveClass(/open/);
+
+    await page.setViewportSize({ width: 390, height: 680 });
+    await page.evaluate(() => {
+      window.dispatchEvent(new Event('resize'));
+      if (window.visualViewport) window.visualViewport.dispatchEvent(new Event('resize'));
+    });
+
+    await expect(page.locator('#chat-overlay')).toHaveClass(/open/);
+    await expect(page.locator('#chat-overlay')).toBeVisible();
+  });
+
   test('desktop shows chat in panel sidebar', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await dismissBootOverlays(page);
