@@ -23,11 +23,28 @@ const MAX_TEXT = 2000;
 const CLUSTER_THRESHOLD = 3;
 const CONFIRM_THRESHOLD = 5;
 const PAYMENT_FAILURE_SIGNALS = new Set(['payment_verify_fail', 'stripe_verify_down']);
+const IGNORED_REPORT_SIGNALS = new Set(['health_check']);
 
 function isPaymentConfigOnlyIssue(entry) {
   if (entry.bugId !== 'payment-verify-fail') return false;
   const signals = entry.lastSignals || [];
   return !signals.some((s) => PAYMENT_FAILURE_SIGNALS.has(s));
+}
+
+function isIgnorableReport(report) {
+  const signals = report.signals || [];
+  const msg = String(report.message || '').toLowerCase();
+  if (msg.includes('health-check') || msg.includes('health_check')) return true;
+  if (signals.length && signals.every((s) => IGNORED_REPORT_SIGNALS.has(s))) return true;
+  if (!signals.length && !String(report.stack || '').trim() && !msg.trim()) return true;
+  return false;
+}
+
+function isActiveIssueEntry(entry) {
+  if (!['clustered', 'probing', 'confirmed'].includes(entry.stage)) return false;
+  if (entry.bugId === 'unknown') return false;
+  if (isPaymentConfigOnlyIssue(entry)) return false;
+  return true;
 }
 
 function json(data, status = 200) {
@@ -90,8 +107,14 @@ async function runServerProbes(env) {
   };
 }
 
-function ruleTriage(report, probe, lifecycle) {
-  const signals = [...(report.signals || []), ...(probe?.signals || [])];
+function ruleTriage(report, probe, lifecycle, opts = {}) {
+  const increment = opts.increment !== false;
+  if (increment && isIgnorableReport(report)) {
+    return { bugId: null, entry: null, confidence: 'low', ignored: true };
+  }
+
+  const reportSignals = (report.signals || []).filter((s) => !IGNORED_REPORT_SIGNALS.has(s));
+  const signals = [...reportSignals, ...(probe?.signals || [])];
   const bug =
     matchBugBySignals(signals) ||
     matchBugByText(report.message) ||
@@ -109,7 +132,7 @@ function ruleTriage(report, probe, lifecycle) {
     fixVersion: bug?.fixedVersion || null,
   };
 
-  entry.reportCount += 1;
+  if (increment) entry.reportCount += 1;
   entry.lastSeen = nowIso();
   entry.lastSignals = signals.slice(0, 20);
   entry.summary = bug?.summary || { zh: '未分類問題', en: 'Unclassified issue' };
@@ -141,6 +164,11 @@ function ruleTriage(report, probe, lifecycle) {
   }
 
   if (bugId === 'payment-verify-fail' && isPaymentConfigOnlyIssue({ bugId, lastSignals: signals })) {
+    entry.stage = 'monitoring';
+    entry.serverConfirmed = false;
+  }
+
+  if (bugId === 'unknown') {
     entry.stage = 'monitoring';
     entry.serverConfirmed = false;
   }
@@ -262,7 +290,7 @@ export class BugLifecycleStore {
       const data = (await this.state.storage.get('data')) || defaultStore();
       data.lastProbe = await runServerProbes(this.env);
       for (const report of data.reports.slice(0, 50)) {
-        ruleTriage(report, data.lastProbe, data.lifecycle);
+        ruleTriage(report, data.lastProbe, data.lifecycle, { increment: false });
       }
       data.lastProbeAt = nowIso();
       await this.state.storage.put('data', data);
@@ -279,8 +307,7 @@ function defaultStore() {
 
 function buildActiveIssues(data) {
   return Object.values(data.lifecycle || {})
-    .filter((e) => ['clustered', 'probing', 'confirmed'].includes(e.stage))
-    .filter((e) => !isPaymentConfigOnlyIssue(e))
+    .filter((e) => isActiveIssueEntry(e))
     .sort((a, b) => {
       const sev = { critical: 0, high: 1, medium: 2, low: 3 };
       return (sev[a.severity] || 9) - (sev[b.severity] || 9);
