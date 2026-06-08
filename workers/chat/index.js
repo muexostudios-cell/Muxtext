@@ -31,11 +31,11 @@ function withCors(response) {
   });
 }
 
-function json(data, status = 200) {
+function json(data, status = 200, extraHeaders = {}) {
   return withCors(
     new Response(JSON.stringify(data), {
       status,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...extraHeaders },
     })
   );
 }
@@ -151,7 +151,7 @@ export class ChatRoom {
     }
 
     if (url.pathname === '/health' && request.method === 'GET') {
-      return json({ ok: true });
+      return json({ ok: true }, 200, { 'Cache-Control': 'public, max-age=30' });
     }
 
     if (url.pathname === '/messages' && request.method === 'GET') {
@@ -159,7 +159,8 @@ export class ChatRoom {
       const after = parseInt(url.searchParams.get('after') || '0', 10);
       const limit = Math.min(parseInt(url.searchParams.get('limit') || '50', 10), MAX_MESSAGES);
       let list = after > 0 ? messages.filter((m) => m.time > after) : messages.slice(-limit);
-      return json({ messages: list });
+      const cacheControl = after > 0 ? 'private, max-age=0' : 'public, max-age=3';
+      return json({ messages: list }, 200, { 'Cache-Control': cacheControl });
     }
 
     if (url.pathname === '/messages' && request.method === 'POST') {
