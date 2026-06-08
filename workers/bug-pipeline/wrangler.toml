@@ -18,3 +18,5 @@ CHAT_HEALTH_URL = "https://muxtext-chat.muexostudios.workers.dev"
 GAME_HEALTH_URL = "https://muexostudios-cell.github.io/Muxtext/"
 STRIPE_VERIFY_HEALTH_URL = ""
 GUN_RELAY_HEALTH_URL = "https://gun.o8.is/gun"
+# Bump to trigger Deploy Bug Pipeline Worker on push
+WORKER_DEPLOY_REVISION = "2"
