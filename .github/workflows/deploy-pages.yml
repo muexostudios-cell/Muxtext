@@ -29,6 +29,9 @@ jobs:
         with:
           enablement: true
 
+      - name: Write version.json from index.html
+        run: node tools/write-version-json.mjs
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
