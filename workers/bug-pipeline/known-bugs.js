@@ -56,12 +56,12 @@ export const KNOWN_BUGS = [
   {
     id: 'payment-verify-fail',
     category: 'server',
-    severity: 'medium',
+    severity: 'low',
     fixedVersion: null,
     keywords: ['付款', 'payment', 'stripe', '晶片', 'chip', 'verify', '充值'],
     clientSignals: ['payment_verify_fail'],
     serverSignals: ['stripe_verify_down'],
-    summary: { zh: '晶片充值驗證失敗', en: 'Chip recharge verification failed' },
+    summary: { zh: '晶片充值驗證失敗（未部署驗證 worker 時為預期狀態）', en: 'Chip recharge verification failed (expected if verify worker not deployed)' },
   },
   {
     id: 'dungeon-stuck',
