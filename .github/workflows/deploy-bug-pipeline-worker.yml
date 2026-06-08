@@ -97,3 +97,10 @@ jobs:
             echo "  CLOUDFLARE_API_TOKEN=... bash tools/deploy-bug-pipeline-worker.sh"
             echo "Or full auto: CLOUDFLARE_API_TOKEN=... bash tools/setup-cloudflare-auto.sh"
           fi
+
+      - name: Fail when worker deploy skipped on push
+        if: steps.cf.outputs.ready != 'true' && github.event_name == 'push'
+        run: |
+          echo "::error::CLOUDFLARE_API_TOKEN missing — Bug Pipeline Worker was NOT deployed."
+          echo "Add CLOUDFLARE_API_TOKEN to repo Secrets → Actions, then re-run this workflow."
+          exit 1

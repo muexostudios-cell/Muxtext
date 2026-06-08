@@ -24,6 +24,7 @@ const CLUSTER_THRESHOLD = 3;
 const CONFIRM_THRESHOLD = 5;
 const PAYMENT_FAILURE_SIGNALS = new Set(['payment_verify_fail', 'stripe_verify_down']);
 const IGNORED_REPORT_SIGNALS = new Set(['health_check', 'stripe_verify_unconfigured']);
+const PIPELINE_CATALOG_VERSION = '2.17.2';
 
 function isPaymentConfigOnlyIssue(entry) {
   if (entry.bugId !== 'payment-verify-fail') return false;
@@ -240,8 +241,11 @@ export class BugLifecycleStore {
 
     if (request.method === 'GET' && path === '/status') {
       const data = (await this.state.storage.get('data')) || defaultStore();
+      reconcileLifecycleWithCatalog(data.lifecycle, data.lastProbe);
+      await this.state.storage.put('data', data);
       return json({
         ok: true,
+        catalogVersion: PIPELINE_CATALOG_VERSION,
         lifecycle: data.lifecycle,
         lastProbe: data.lastProbe,
         activeIssues: buildActiveIssues(data),
@@ -313,9 +317,15 @@ export class BugLifecycleStore {
       for (const report of data.reports.slice(0, 50)) {
         ruleTriage(report, data.lastProbe, data.lifecycle, { increment: false });
       }
+      reconcileLifecycleWithCatalog(data.lifecycle, data.lastProbe);
       data.lastProbeAt = nowIso();
       await this.state.storage.put('data', data);
-      return json({ ok: true, probe: data.lastProbe, activeIssues: buildActiveIssues(data) });
+      return json({
+        ok: true,
+        catalogVersion: PIPELINE_CATALOG_VERSION,
+        probe: data.lastProbe,
+        activeIssues: buildActiveIssues(data),
+      });
     }
 
     return json({ error: 'not_found' }, 404);
@@ -324,6 +334,31 @@ export class BugLifecycleStore {
 
 function defaultStore() {
   return { reports: [], lifecycle: {}, lastProbe: null, lastProbeAt: null };
+}
+
+function reconcileLifecycleWithCatalog(lifecycle, probe) {
+  const probeSignals = probe?.signals || [];
+  const stripeSkipped = !probe || probe.stripe?.skipped;
+  for (const bug of KNOWN_BUGS) {
+    const entry = lifecycle[bug.id];
+    if (!entry) continue;
+    entry.summary = bug.summary;
+    entry.severity = bug.severity;
+    entry.category = bug.category;
+    if (bug.fixedVersion) {
+      entry.fixVersion = bug.fixedVersion;
+      const serverStillBroken = bug.serverSignals?.some((s) => probeSignals.includes(s));
+      if (!serverStillBroken && entry.stage !== 'confirmed') {
+        entry.stage = 'fixed';
+        entry.serverConfirmed = false;
+      }
+    }
+  }
+  const pay = lifecycle['payment-verify-fail'];
+  if (pay && (isPaymentConfigOnlyIssue(pay) || stripeSkipped)) {
+    pay.stage = 'monitoring';
+    pay.serverConfirmed = false;
+  }
 }
 
 function buildActiveIssues(data) {
@@ -346,7 +381,12 @@ export default {
     const path = url.pathname.replace(/\/$/, '') || '/';
 
     if (path === '/health') {
-      return json({ ok: true, service: 'muxtext-bug-pipeline', at: nowIso() });
+      return json({
+        ok: true,
+        service: 'muxtext-bug-pipeline',
+        catalogVersion: PIPELINE_CATALOG_VERSION,
+        at: nowIso(),
+      });
     }
 
     const id = env.BUG_STORE.idFromName('global');
