@@ -7,6 +7,7 @@ on:
     paths:
       - 'workers/chat/**'
       - '.github/workflows/deploy-chat-worker.yml'
+      - 'tools/cloudflare-resolve-account.sh'
 
 jobs:
   deploy:
@@ -16,23 +17,56 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check Cloudflare secrets
+      - name: Check Cloudflare API token
+        id: cf
         run: |
-          if [ -z "${{ secrets.CLOUDFLARE_API_TOKEN }}" ] || [ -z "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}" ]; then
-            echo "::error::Add CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID in repo Settings → Secrets → Actions"
-            exit 1
+          if [ -z "${{ secrets.CLOUDFLARE_API_TOKEN }}" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Skipped — add CLOUDFLARE_API_TOKEN in repo Settings → Secrets → Actions."
+            echo ""
+            echo "Quick setup (auto-resolves Account ID):"
+            echo "  1. https://dash.cloudflare.com/profile/api-tokens → Create Token"
+            echo "     Template: Edit Cloudflare Workers"
+            echo "  2. On this VM: CLOUDFLARE_API_TOKEN=... bash tools/setup-cloudflare-auto.sh"
+            echo "     Or add CLOUDFLARE_API_TOKEN to GitHub Secrets and re-run this workflow."
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Resolve Cloudflare Account ID
+        if: steps.cf.outputs.ready == 'true'
+        id: account
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -e
+          if [ -n "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            ACCOUNT_ID="$CLOUDFLARE_ACCOUNT_ID"
+            echo "Using CLOUDFLARE_ACCOUNT_ID from secrets"
+          else
+            chmod +x tools/cloudflare-resolve-account.sh
+            ACCOUNT_ID="$(bash tools/cloudflare-resolve-account.sh)"
+            if [ -z "$ACCOUNT_ID" ]; then
+              echo "::error::Could not resolve Account ID from API token"
+              exit 1
+            fi
+            echo "Resolved Account ID from API token: $ACCOUNT_ID"
+          fi
+          echo "account_id=$ACCOUNT_ID" >> "$GITHUB_OUTPUT"
+
       - uses: actions/setup-node@v4
+        if: steps.cf.outputs.ready == 'true'
         with:
           node-version: '20'
 
       - name: Deploy Cloudflare Worker
+        if: steps.cf.outputs.ready == 'true'
         id: deploy
         working-directory: workers/chat
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ steps.account.outputs.account_id }}
         run: |
           set -e
           npx wrangler deploy 2>&1 | tee /tmp/wrangler-chat-deploy.log
@@ -48,6 +82,7 @@ jobs:
           fi
 
       - name: Worker URL hint
+        if: steps.cf.outputs.ready == 'true'
         run: |
           URL="${{ steps.deploy.outputs.worker_url }}"
           if [ -n "$URL" ]; then
