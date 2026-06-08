@@ -95,6 +95,64 @@ test('dungeon path keeps a single player marker and anchors from current tile', 
   expect(afterMove).toEqual(target);
   await expect.poll(() => countPlayerMarkers(page)).toBe(1);
 
+  const farTarget = await page.evaluate(() => {
+    const cells = Array.from(document.querySelectorAll('#map .cell'));
+    const player = cells.find((el) => el.textContent === '@');
+    const pr = Number(player.dataset.r);
+    const pc = Number(player.dataset.c);
+    const visible = (el) => {
+      const rect = el.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
+    };
+    const candidates = cells.filter((el) => {
+      if (!visible(el) || el.textContent === '@') return false;
+      const r = Number(el.dataset.r);
+      const c = Number(el.dataset.c);
+      return Math.abs(r - pr) + Math.abs(c - pc) >= 3;
+    });
+    if (!candidates.length) return null;
+    candidates.sort((a, b) => {
+      const ar = Math.abs(Number(a.dataset.r) - pr) + Math.abs(Number(a.dataset.c) - pc);
+      const br = Math.abs(Number(b.dataset.r) - pr) + Math.abs(Number(b.dataset.c) - pc);
+      return br - ar;
+    });
+    return { r: Number(candidates[0].dataset.r), c: Number(candidates[0].dataset.c) };
+  });
+
+  if (farTarget) {
+    await page.locator(`#map .cell[data-r="${farTarget.r}"][data-c="${farTarget.c}"]`).click({ force: true });
+    await page.waitForTimeout(300);
+    const midPos = await getPlayerCell(page);
+    expect(midPos).not.toBeNull();
+    expect(midPos).not.toEqual(start);
+
+    const retarget = await page.evaluate(() => {
+      const cells = Array.from(document.querySelectorAll('#map .cell'));
+      const player = cells.find((el) => el.textContent === '@');
+      const pr = Number(player.dataset.r);
+      const pc = Number(player.dataset.c);
+      const visible = (el) => {
+        const rect = el.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      };
+      const hit = cells.find((el) => {
+        if (!visible(el) || el.textContent === '@') return false;
+        const r = Number(el.dataset.r);
+        const c = Number(el.dataset.c);
+        return Math.abs(r - pr) + Math.abs(c - pc) === 1;
+      });
+      if (!hit) return null;
+      return { r: Number(hit.dataset.r), c: Number(hit.dataset.c) };
+    });
+    if (retarget) {
+      await page.locator(`#map .cell[data-r="${retarget.r}"][data-c="${retarget.c}"]`).click({ force: true });
+      await page.waitForTimeout(700);
+      const reanchored = await getPlayerCell(page);
+      expect(reanchored).toEqual(retarget);
+      await expect.poll(() => countPlayerMarkers(page)).toBe(1);
+    }
+  }
+
   let combatPos = null;
   for (let attempt = 0; attempt < 15; attempt += 1) {
     if (await page.locator('#battle-screen.active').isVisible()) break;
@@ -164,11 +222,16 @@ test('dungeon path keeps a single player marker and anchors from current tile', 
       const player = cells.find((el) => el.textContent === '@');
       const pr = Number(player.dataset.r);
       const pc = Number(player.dataset.c);
+      const visible = (el) => {
+        const rect = el.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      };
       const next = cells.find((el) => {
+        if (!visible(el)) return false;
         const r = Number(el.dataset.r);
         const c = Number(el.dataset.c);
         const ch = el.textContent;
-        if (ch === '@' || ch === '#' || ch === 'M') return false;
+        if (ch === '@' || ch === '#' || ch === 'M' || ch === 'S' || ch === 'E') return false;
         return Math.abs(r - pr) + Math.abs(c - pc) === 1;
       });
       if (!next) return null;
