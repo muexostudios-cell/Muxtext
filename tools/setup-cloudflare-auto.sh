@@ -51,8 +51,19 @@ cf_curl() {
 verify_api_token() {
   local resp
   resp="$(cf_curl "${CF_API}/user/tokens/verify")"
-  echo "$resp" | jq -e '.success == true and .result.status == "active"' >/dev/null
-  echo "Token valid (id=$(echo "$resp" | jq -r '.result.id'))"
+  if echo "$resp" | jq -e '.success == true and .result.status == "active"' >/dev/null 2>&1; then
+    echo "Token valid (id=$(echo "$resp" | jq -r '.result.id'))"
+    return 0
+  fi
+  # Account-scoped tokens (cfat_*) may fail /verify but still work for /accounts
+  resp="$(cf_curl "${CF_API}/accounts?per_page=1")"
+  if echo "$resp" | jq -e '.success == true and (.result|length) > 0' >/dev/null; then
+    echo "Token valid (account API; verify endpoint skipped)"
+    return 0
+  fi
+  echo "Invalid Cloudflare API token." >&2
+  echo "$resp" | jq . >&2 2>/dev/null || true
+  exit 1
 }
 
 resolve_account_id() {
