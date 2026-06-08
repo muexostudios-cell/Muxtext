@@ -81,6 +81,14 @@ function sanitizeEquipItem(raw) {
   };
 }
 
+function sanitizeInvRow(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const id = String(raw.id || raw.i || '').slice(0, 24);
+  if (!id) return null;
+  const q = clampInt(raw.q ?? raw.qty, 0, 99999, 0);
+  return q > 0 ? { id, q } : null;
+}
+
 function sanitizeProfile(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
 
@@ -116,6 +124,24 @@ function sanitizeProfile(raw) {
     for (const slot of Object.keys(raw.equip).slice(0, 12)) {
       const item = sanitizeEquipItem(raw.equip[slot]);
       if (item) profile.equip[slot] = item;
+    }
+  }
+
+  profile.inv = [];
+  if (Array.isArray(raw.inv)) {
+    for (const row of raw.inv.slice(0, 40)) {
+      const item = sanitizeInvRow(row);
+      if (item) profile.inv.push(item);
+    }
+  }
+
+  profile.tp = clampInt(raw.tp ?? raw.talentPoints, 0, 9999, 0);
+
+  profile.eqBag = [];
+  if (Array.isArray(raw.eqBag)) {
+    for (const eq of raw.eqBag.slice(0, 30)) {
+      const item = sanitizeEquipItem(eq);
+      if (item) profile.eqBag.push(item);
     }
   }
 
