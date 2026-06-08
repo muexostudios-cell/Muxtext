@@ -23,12 +23,23 @@ const MAX_TEXT = 2000;
 const CLUSTER_THRESHOLD = 3;
 const CONFIRM_THRESHOLD = 5;
 const PAYMENT_FAILURE_SIGNALS = new Set(['payment_verify_fail', 'stripe_verify_down']);
-const IGNORED_REPORT_SIGNALS = new Set(['health_check']);
+const IGNORED_REPORT_SIGNALS = new Set(['health_check', 'stripe_verify_unconfigured']);
 
 function isPaymentConfigOnlyIssue(entry) {
   if (entry.bugId !== 'payment-verify-fail') return false;
   const signals = entry.lastSignals || [];
+  if (signals.includes('stripe_verify_unconfigured')) return true;
   return !signals.some((s) => PAYMENT_FAILURE_SIGNALS.has(s));
+}
+
+function isCloudSyncReport(signals = [], report = {}) {
+  const set = new Set(signals);
+  if (set.has('cloud_sync_offline') || set.has('cloud_upload_fail') || set.has('gun_relay_blocked')) return true;
+  const msg = String(report.message || '').toLowerCase();
+  const stack = String(report.stack || '').toLowerCase();
+  if (/timeout|relay|cloud.?sync|同步|gun.?relay/.test(msg)) return true;
+  if (/putcloudaccount|fetchcloudaccount|uploadcloudaccount|forcecloudsync|tickcloudidle/.test(stack.replace(/[^a-z]/g, ''))) return true;
+  return false;
 }
 
 function isIgnorableReport(report) {
@@ -86,23 +97,27 @@ async function runServerProbes(env) {
   const chatUrl = env.CHAT_HEALTH_URL || '';
   const gameUrl = env.GAME_HEALTH_URL || 'https://muexostudios-cell.github.io/Muxtext/';
   const stripeUrl = env.STRIPE_VERIFY_HEALTH_URL || '';
+  const gunUrl = env.GUN_RELAY_HEALTH_URL || 'https://gun.o8.is/gun';
 
-  const [chat, game, stripe] = await Promise.all([
+  const [chat, game, stripe, gun] = await Promise.all([
     probeUrl(chatUrl ? `${chatUrl.replace(/\/$/, '')}/health` : ''),
     probeUrl(gameUrl),
     probeUrl(stripeUrl ? `${stripeUrl.replace(/\/$/, '')}/health` : stripeUrl),
+    probeUrl(gunUrl),
   ]);
 
   const signals = [];
   if (chatUrl && !chat.ok) signals.push('chat_worker_down');
   if (!game.ok) signals.push('game_host_down');
   if (stripeUrl && !stripe.ok) signals.push('stripe_verify_down');
+  if (!gun.ok) signals.push('gun_relay_unreachable');
 
   return {
     at: nowIso(),
     chat: chatUrl ? chat : { ok: null, skipped: true },
     game,
     stripe: stripeUrl ? stripe : { ok: null, skipped: true },
+    gun,
     signals,
   };
 }
@@ -115,11 +130,13 @@ function ruleTriage(report, probe, lifecycle, opts = {}) {
 
   const reportSignals = (report.signals || []).filter((s) => !IGNORED_REPORT_SIGNALS.has(s));
   const signals = [...reportSignals, ...(probe?.signals || [])];
-  const bug =
-    matchBugBySignals(signals) ||
-    matchBugByText(report.message) ||
-    matchBugByText(report.stack) ||
-    null;
+  let bug = matchBugBySignals(signals) || null;
+  if (!bug && reportSignals.includes('unhandled_rejection') && !isCloudSyncReport(signals, report)) {
+    bug = null;
+  } else if (!bug) {
+    bug = matchBugByText(report.message) || matchBugByText(report.stack) || null;
+    if (bug?.id === 'cloud-sync-fail' && !isCloudSyncReport(signals, report)) bug = null;
+  }
 
   const bugId = bug?.id || 'unknown';
   const entry = lifecycle[bugId] || {
@@ -154,6 +171,10 @@ function ruleTriage(report, probe, lifecycle, opts = {}) {
     entry.serverConfirmed = true;
   }
   if (probe && !probe.game?.ok && bugId === 'game-host-down') {
+    entry.stage = 'confirmed';
+    entry.serverConfirmed = true;
+  }
+  if (probe && signals.includes('gun_relay_unreachable') && bugId === 'cloud-sync-fail') {
     entry.stage = 'confirmed';
     entry.serverConfirmed = true;
   }
