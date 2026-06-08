@@ -7,6 +7,7 @@ on:
     paths:
       - 'workers/bug-pipeline/**'
       - '.github/workflows/deploy-bug-pipeline-worker.yml'
+      - 'tools/cloudflare-resolve-account.sh'
 
 jobs:
   deploy:
@@ -16,22 +17,43 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check Cloudflare secrets
+      - name: Check Cloudflare API token
         id: cf
         run: |
-          if [ -z "${{ secrets.CLOUDFLARE_API_TOKEN }}" ] || [ -z "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}" ]; then
+          if [ -z "${{ secrets.CLOUDFLARE_API_TOKEN }}" ]; then
             echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::Skipped — add CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID in repo Settings → Secrets → Actions, then re-run this workflow (Actions → Deploy Bug Pipeline Worker → Run workflow)."
+            echo "::warning::Skipped — add CLOUDFLARE_API_TOKEN in repo Settings → Secrets → Actions."
             echo ""
-            echo "One-time setup:"
+            echo "Quick setup (auto-resolves Account ID):"
             echo "  1. https://dash.cloudflare.com/profile/api-tokens → Create Token"
-            echo "     Template: Edit Cloudflare Workers + Account / Workers Scripts / Edit + Durable Objects / Edit"
-            echo "  2. Account ID: Cloudflare dashboard right sidebar (or Workers overview URL)"
-            echo "  3. Repo → Settings → Secrets and variables → Actions → New repository secret"
-            echo "  4. Re-run workflow or: CLOUDFLARE_API_TOKEN=... CLOUDFLARE_ACCOUNT_ID=... bash tools/deploy-bug-pipeline-worker.sh"
+            echo "     Template: Edit Cloudflare Workers"
+            echo "  2. On this VM: CLOUDFLARE_API_TOKEN=... bash tools/setup-cloudflare-auto.sh"
+            echo "     Or add CLOUDFLARE_API_TOKEN to GitHub Secrets and re-run this workflow."
           else
             echo "ready=true" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Resolve Cloudflare Account ID
+        if: steps.cf.outputs.ready == 'true'
+        id: account
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -e
+          if [ -n "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            ACCOUNT_ID="$CLOUDFLARE_ACCOUNT_ID"
+            echo "Using CLOUDFLARE_ACCOUNT_ID from secrets"
+          else
+            chmod +x tools/cloudflare-resolve-account.sh
+            ACCOUNT_ID="$(bash tools/cloudflare-resolve-account.sh)"
+            if [ -z "$ACCOUNT_ID" ]; then
+              echo "::error::Could not resolve Account ID from API token"
+              exit 1
+            fi
+            echo "Resolved Account ID from API token: $ACCOUNT_ID"
+          fi
+          echo "account_id=$ACCOUNT_ID" >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-node@v4
         if: steps.cf.outputs.ready == 'true'
@@ -44,7 +66,7 @@ jobs:
         working-directory: workers/bug-pipeline
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ steps.account.outputs.account_id }}
         run: |
           set -e
           npx wrangler deploy 2>&1 | tee /tmp/wrangler-bug-deploy.log
@@ -71,8 +93,7 @@ jobs:
         run: |
           URL="${{ steps.deploy.outputs.worker_url }}"
           if [ -n "$URL" ]; then
-            echo "Update index.html BUG_PIPELINE_CONFIG.endpoint to:"
-            echo "$URL"
-            echo "Run locally to auto-patch index.html:"
-            echo "  CLOUDFLARE_API_TOKEN=... CLOUDFLARE_ACCOUNT_ID=... bash tools/deploy-bug-pipeline-worker.sh"
+            echo "Patch index.html:"
+            echo "  CLOUDFLARE_API_TOKEN=... bash tools/deploy-bug-pipeline-worker.sh"
+            echo "Or full auto: CLOUDFLARE_API_TOKEN=... bash tools/setup-cloudflare-auto.sh"
           fi
