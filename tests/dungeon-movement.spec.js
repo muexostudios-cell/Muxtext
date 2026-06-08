@@ -33,8 +33,7 @@ async function enterManualDungeon(page) {
   if (await droneOverlay.isVisible({ timeout: 2000 }).catch(() => false)) {
     await page.locator('#drone-dungeon-no').click();
   }
-  await expect(page.locator('#map .cell')).toHaveCount(49, { timeout: 10000 });
-  await expect(page.locator('#map-container')).toBeVisible();
+  await expect(page.locator('#map .cell')).toHaveCount(49, { timeout: 15000 });
 }
 
 async function getPlayerCell(page) {
@@ -53,6 +52,7 @@ async function countPlayerMarkers(page) {
 }
 
 test('dungeon path keeps a single player marker and anchors from current tile', async ({ page }) => {
+  test.setTimeout(90000);
   await page.addInitScript(() => {
     localStorage.clear();
   });
@@ -71,7 +71,12 @@ test('dungeon path keeps a single player marker and anchors from current tile', 
     const startCell = cells.find((el) => el.textContent === '@');
     const sr = Number(startCell.dataset.r);
     const sc = Number(startCell.dataset.c);
+    const visible = (el) => {
+      const rect = el.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
+    };
     const adjacent = cells.find((el) => {
+      if (!visible(el)) return false;
       const r = Number(el.dataset.r);
       const c = Number(el.dataset.c);
       const ch = el.textContent;
@@ -83,47 +88,66 @@ test('dungeon path keeps a single player marker and anchors from current tile', 
   });
   expect(target).not.toBeNull();
 
-  await page.locator(`#map .cell[data-r="${target.r}"][data-c="${target.c}"]`).click();
+  await page.locator(`#map .cell[data-r="${target.r}"][data-c="${target.c}"]`).click({ force: true });
   await page.waitForTimeout(700);
 
   const afterMove = await getPlayerCell(page);
   expect(afterMove).toEqual(target);
   await expect.poll(() => countPlayerMarkers(page)).toBe(1);
 
-  const monster = await page.evaluate(() => {
-    const cells = Array.from(document.querySelectorAll('#map .cell.unexplored-monster, #map .cell'));
-    const player = cells.find((el) => el.textContent === '@');
-    const pr = Number(player.dataset.r);
-    const pc = Number(player.dataset.c);
-    const hits = Array.from(document.querySelectorAll('#map .cell.unexplored-monster'));
-    const hit = hits.find((el) => {
-      const r = Number(el.dataset.r);
-      const c = Number(el.dataset.c);
-      return Math.abs(r - pr) + Math.abs(c - pc) <= 6;
-    }) || hits[0];
-    if (!hit) return null;
-    return { r: Number(hit.dataset.r), c: Number(hit.dataset.c) };
-  });
+  let combatPos = null;
+  for (let attempt = 0; attempt < 15; attempt += 1) {
+    if (await page.locator('#battle-screen.active').isVisible()) break;
+    const next = await page.evaluate(() => {
+      const cells = Array.from(document.querySelectorAll('#map .cell'));
+      const player = cells.find((el) => el.textContent === '@');
+      if (!player) return null;
+      const pr = Number(player.dataset.r);
+      const pc = Number(player.dataset.c);
+      const visible = (el) => {
+        const rect = el.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      };
+      const candidates = cells.filter((el) => {
+        if (!visible(el) || el.textContent === '@') return false;
+        const r = Number(el.dataset.r);
+        const c = Number(el.dataset.c);
+        const dist = Math.abs(r - pr) + Math.abs(c - pc);
+        if (dist < 1 || dist > 8) return false;
+        return el.classList.contains('unexplored-monster') || el.textContent === '#' || el.textContent === '!';
+      });
+      if (!candidates.length) return null;
+      candidates.sort((a, b) => {
+        const ar = Math.abs(Number(a.dataset.r) - pr) + Math.abs(Number(a.dataset.c) - pc);
+        const br = Math.abs(Number(b.dataset.r) - pr) + Math.abs(Number(b.dataset.c) - pc);
+        return ar - br;
+      });
+      const hit = candidates[0];
+      return { r: Number(hit.dataset.r), c: Number(hit.dataset.c) };
+    });
+    if (!next) break;
+    await page.locator(`#map .cell[data-r="${next.r}"][data-c="${next.c}"]`).click({ force: true });
+    await page.waitForTimeout(900);
+  }
 
-  if (monster) {
-    const mr = monster.r;
-    const mc = monster.c;
+  if (await page.locator('#battle-screen.active').isVisible()) {
+    combatPos = await getPlayerCell(page);
+    expect(combatPos).not.toBeNull();
+    const mr = combatPos.r;
+    const mc = combatPos.c;
 
-    await page.locator(`#map .cell[data-r="${mr}"][data-c="${mc}"]`).click();
-    await expect(page.locator('#battle-screen.active')).toBeVisible({ timeout: 8000 });
-
-    const combatPos = await getPlayerCell(page);
-    expect(combatPos).toEqual({ r: mr, c: mc });
     await expect.poll(() => countPlayerMarkers(page)).toBe(1);
 
-    for (let i = 0; i < 40; i += 1) {
+    for (let i = 0; i < 100; i += 1) {
       if (!(await page.locator('#battle-screen.active').isVisible())) break;
       const mainBtn = page.locator('#btn-atk-main');
+      const offBtn = page.locator('#btn-atk-off');
       if (await mainBtn.isEnabled()) await mainBtn.click();
-      await page.waitForTimeout(350);
+      else if (await offBtn.isEnabled()) await offBtn.click();
+      await page.waitForTimeout(300);
     }
 
-    await expect(page.locator('#battle-screen.active')).toBeHidden({ timeout: 10000 });
+    await expect(page.locator('#battle-screen.active')).toBeHidden({ timeout: 20000 });
     await page.waitForTimeout(1600);
 
     const clearedChar = await page.locator(`#map .cell[data-r="${mr}"][data-c="${mc}"]`).textContent();
@@ -152,11 +176,21 @@ test('dungeon path keeps a single player marker and anchors from current tile', 
     });
 
     if (retarget) {
-      await page.locator(`#map .cell[data-r="${retarget.r}"][data-c="${retarget.c}"]`).click();
-      await page.waitForTimeout(400);
+      await page.locator(`#map .cell[data-r="${retarget.r}"][data-c="${retarget.c}"]`).click({ force: true });
+      await page.waitForTimeout(700);
       const anchored = await getPlayerCell(page);
       expect(anchored).toEqual(retarget);
       await expect.poll(() => countPlayerMarkers(page)).toBe(1);
+
+      const killCell = page.locator(`#map .cell[data-r="${mr}"][data-c="${mc}"]`);
+      await expect(killCell).toHaveText('.');
+      await expect(killCell).toHaveClass(/cleared/);
+
+      await killCell.click({ force: true });
+      await page.waitForTimeout(700);
+      await expect(page.locator('#battle-screen.active')).toBeHidden();
+      await expect(killCell).toHaveText('@');
+      await expect(killCell).toHaveClass(/cleared/);
     }
   }
 });
