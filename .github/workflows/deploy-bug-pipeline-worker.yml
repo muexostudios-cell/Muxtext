@@ -1,0 +1,59 @@
+name: Deploy Bug Pipeline Worker
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'workers/bug-pipeline/**'
+      - '.github/workflows/deploy-bug-pipeline-worker.yml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check Cloudflare secrets
+        run: |
+          if [ -z "${{ secrets.CLOUDFLARE_API_TOKEN }}" ] || [ -z "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}" ]; then
+            echo "::error::Add CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID in repo Settings → Secrets → Actions"
+            exit 1
+          fi
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Deploy Cloudflare Worker
+        id: deploy
+        working-directory: workers/bug-pipeline
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -e
+          npx wrangler deploy 2>&1 | tee /tmp/wrangler-bug-deploy.log
+          URL=$(grep -oE 'https://muxtext-bug-pipeline\.[a-zA-Z0-9.-]+\.workers\.dev' /tmp/wrangler-bug-deploy.log | head -1 || true)
+          if [ -z "$URL" ]; then
+            URL=$(grep -oE 'https://[a-zA-Z0-9.-]+\.workers\.dev' /tmp/wrangler-bug-deploy.log | grep muxtext-bug-pipeline | head -1 || true)
+          fi
+          if [ -n "$URL" ]; then
+            echo "worker_url=$URL" >> "$GITHUB_OUTPUT"
+            echo "Deployed bug pipeline worker: $URL"
+          else
+            echo "::warning::Deploy succeeded but workers.dev URL was not found in wrangler output"
+          fi
+
+      - name: Worker URL hint
+        run: |
+          URL="${{ steps.deploy.outputs.worker_url }}"
+          if [ -n "$URL" ]; then
+            echo "Set BUG_PIPELINE_CONFIG.endpoint in index.html to:"
+            echo "$URL"
+            echo "Or run: CLOUDFLARE_API_TOKEN=... bash tools/deploy-bug-pipeline-worker.sh"
+          else
+            echo "Check Cloudflare dashboard → Workers → muxtext-bug-pipeline"
+          fi

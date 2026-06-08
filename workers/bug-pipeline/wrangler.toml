@@ -1,0 +1,19 @@
+name = "muxtext-bug-pipeline"
+main = "index.js"
+compatibility_date = "2024-01-01"
+
+[[durable_objects.bindings]]
+name = "BUG_STORE"
+class_name = "BugLifecycleStore"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["BugLifecycleStore"]
+
+[triggers]
+crons = ["*/15 * * * *"]
+
+[vars]
+CHAT_HEALTH_URL = "https://muxtext-chat.muexostudios.workers.dev"
+GAME_HEALTH_URL = "https://muexostudios-cell.github.io/Muxtext/"
+STRIPE_VERIFY_HEALTH_URL = ""
