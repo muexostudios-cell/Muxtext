@@ -7,7 +7,7 @@ export const KNOWN_BUGS = [
     id: 'level-rollback',
     category: 'save',
     severity: 'high',
-    fixedVersion: '2.14.3',
+    fixedVersion: '2.17.6',
     keywords: ['等級', '回調', 'rollback', 'level', '降級', '經驗', 'xp', 'peak'],
     clientSignals: ['level_regression', 'peak_level_mismatch'],
     serverSignals: [],
