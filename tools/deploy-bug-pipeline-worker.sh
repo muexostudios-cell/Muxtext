@@ -6,11 +6,20 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 WORKER_DIR="$ROOT/workers/bug-pipeline"
 INDEX="$ROOT/index.html"
 
-if [[ -z "${CLOUDFLARE_API_TOKEN:-}" ]]; then
-  echo "Missing CLOUDFLARE_API_TOKEN."
-  echo "Create at: https://dash.cloudflare.com/profile/api-tokens"
+if [[ -z "${CLOUDFLARE_API_TOKEN:-}" ]] || [[ -z "${CLOUDFLARE_ACCOUNT_ID:-}" ]]; then
+  echo "Missing Cloudflare credentials."
+  echo ""
+  echo "Required env vars:"
+  echo "  CLOUDFLARE_API_TOKEN   — https://dash.cloudflare.com/profile/api-tokens"
+  echo "                         (Workers Scripts Edit + Durable Objects Edit)"
+  echo "  CLOUDFLARE_ACCOUNT_ID  — Cloudflare dashboard → right sidebar"
+  echo ""
+  echo "GitHub Actions: repo Settings → Secrets → Actions → add both secrets,"
+  echo "then Actions → Deploy Bug Pipeline Worker → Run workflow."
   exit 1
 fi
+
+export CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID
 
 cd "$WORKER_DIR"
 DEPLOY_LOG="$(mktemp)"
