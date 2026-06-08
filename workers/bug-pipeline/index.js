@@ -22,6 +22,13 @@ const MAX_REPORTS = 500;
 const MAX_TEXT = 2000;
 const CLUSTER_THRESHOLD = 3;
 const CONFIRM_THRESHOLD = 5;
+const PAYMENT_FAILURE_SIGNALS = new Set(['payment_verify_fail', 'stripe_verify_down']);
+
+function isPaymentConfigOnlyIssue(entry) {
+  if (entry.bugId !== 'payment-verify-fail') return false;
+  const signals = entry.lastSignals || [];
+  return !signals.some((s) => PAYMENT_FAILURE_SIGNALS.has(s));
+}
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -73,7 +80,6 @@ async function runServerProbes(env) {
   if (chatUrl && !chat.ok) signals.push('chat_worker_down');
   if (!game.ok) signals.push('game_host_down');
   if (stripeUrl && !stripe.ok) signals.push('stripe_verify_down');
-  if (!stripeUrl) signals.push('stripe_verify_unconfigured');
 
   return {
     at: nowIso(),
@@ -132,6 +138,11 @@ function ruleTriage(report, probe, lifecycle) {
   if (bug?.fixedVersion && entry.stage !== 'confirmed') {
     entry.stage = 'fixed';
     entry.fixVersion = bug.fixedVersion;
+  }
+
+  if (bugId === 'payment-verify-fail' && isPaymentConfigOnlyIssue({ bugId, lastSignals: signals })) {
+    entry.stage = 'monitoring';
+    entry.serverConfirmed = false;
   }
 
   lifecycle[bugId] = entry;
@@ -269,6 +280,7 @@ function defaultStore() {
 function buildActiveIssues(data) {
   return Object.values(data.lifecycle || {})
     .filter((e) => ['clustered', 'probing', 'confirmed'].includes(e.stage))
+    .filter((e) => !isPaymentConfigOnlyIssue(e))
     .sort((a, b) => {
       const sev = { critical: 0, high: 1, medium: 2, low: 3 };
       return (sev[a.severity] || 9) - (sev[b.severity] || 9);

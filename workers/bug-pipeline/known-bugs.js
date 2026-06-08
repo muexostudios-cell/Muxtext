@@ -60,8 +60,8 @@ export const KNOWN_BUGS = [
     fixedVersion: null,
     keywords: ['付款', 'payment', 'stripe', '晶片', 'chip', 'verify', '充值'],
     clientSignals: ['payment_verify_fail'],
-    serverSignals: ['stripe_verify_down', 'stripe_verify_unconfigured'],
-    summary: { zh: '晶片充值驗證失敗或伺服器未設定', en: 'Chip recharge verification failed or unconfigured' },
+    serverSignals: ['stripe_verify_down'],
+    summary: { zh: '晶片充值驗證失敗', en: 'Chip recharge verification failed' },
   },
   {
     id: 'dungeon-stuck',
