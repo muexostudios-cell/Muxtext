@@ -6,17 +6,24 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 WORKER_DIR="$ROOT/workers/bug-pipeline"
 INDEX="$ROOT/index.html"
 
-if [[ -z "${CLOUDFLARE_API_TOKEN:-}" ]] || [[ -z "${CLOUDFLARE_ACCOUNT_ID:-}" ]]; then
-  echo "Missing Cloudflare credentials."
+if [[ -z "${CLOUDFLARE_API_TOKEN:-}" ]]; then
+  echo "Missing CLOUDFLARE_API_TOKEN."
   echo ""
-  echo "Required env vars:"
-  echo "  CLOUDFLARE_API_TOKEN   — https://dash.cloudflare.com/profile/api-tokens"
-  echo "                         (Workers Scripts Edit + Durable Objects Edit)"
-  echo "  CLOUDFLARE_ACCOUNT_ID  — Cloudflare dashboard → right sidebar"
+  echo "One-command setup (auto-resolves Account ID):"
+  echo "  CLOUDFLARE_API_TOKEN=... bash tools/setup-cloudflare-auto.sh"
   echo ""
-  echo "GitHub Actions: repo Settings → Secrets → Actions → add both secrets,"
-  echo "then Actions → Deploy Bug Pipeline Worker → Run workflow."
+  echo "Create token: https://dash.cloudflare.com/profile/api-tokens"
+  echo "  Template: Edit Cloudflare Workers"
   exit 1
+fi
+
+if [[ -z "${CLOUDFLARE_ACCOUNT_ID:-}" ]]; then
+  CLOUDFLARE_ACCOUNT_ID="$(bash "$(dirname "$0")/cloudflare-resolve-account.sh")"
+  if [[ -z "$CLOUDFLARE_ACCOUNT_ID" ]]; then
+    echo "Could not resolve Account ID from API token." >&2
+    exit 1
+  fi
+  echo "Resolved Account ID: $CLOUDFLARE_ACCOUNT_ID"
 fi
 
 export CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID
