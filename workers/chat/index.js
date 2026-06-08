@@ -12,7 +12,7 @@ const MAX_MESSAGES = 100;
 const MAX_TEXT = 200;
 const MAX_USER = 32;
 const MAX_LEVEL = 99999;
-const MAX_PROFILE_BYTES = 12000;
+const MAX_PROFILE_BYTES = 20000;
 const SEND_COOLDOWN_MS = 1500;
 
 const CORS_HEADERS = {
@@ -57,7 +57,7 @@ function clampInt(value, min, max, fallback = 0) {
 function sanitizeAvatarUrl(url) {
   if (!url || typeof url !== 'string') return '';
   const trimmed = url.trim();
-  if (!trimmed.startsWith('data:image/') || trimmed.length > 12000) return '';
+  if (!trimmed.startsWith('data:image/') || trimmed.length > 8000) return '';
   return trimmed;
 }
 
