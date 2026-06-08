@@ -40,6 +40,21 @@ Push to `main` triggers `.github/workflows/deploy-pages.yml` (GitHub Pages). **O
 - Global: `td_settings`, `td_lang`
 - **Debug hook**: `window.repairDrone` is exposed globally for drone repair during development
 
+### Bug Pipeline Worker
+
+- Config in `index.html`: `BUG_PIPELINE_CONFIG.endpoint` (empty until worker is deployed)
+- Worker source: `workers/bug-pipeline/` (`/health`, `/status`, `/report`, `/probe`)
+- **One-time Cloudflare secrets** (same as chat/stripe workers):
+  1. [Create API token](https://dash.cloudflare.com/profile/api-tokens) — permissions: **Account → Workers Scripts → Edit**, **Durable Objects → Edit**
+  2. Copy **Account ID** from Cloudflare dashboard (right sidebar on any zone/account page)
+  3. GitHub repo → **Settings → Secrets and variables → Actions** → add:
+     - `CLOUDFLARE_API_TOKEN`
+     - `CLOUDFLARE_ACCOUNT_ID`
+  4. **Actions → Deploy Bug Pipeline Worker → Run workflow** (or push `workers/bug-pipeline/**`)
+  5. Patch endpoint into game: `CLOUDFLARE_API_TOKEN=... CLOUDFLARE_ACCOUNT_ID=... bash tools/deploy-bug-pipeline-worker.sh` then commit `index.html`
+- Optional: `cd workers/bug-pipeline && npx wrangler secret put OPENAI_API_KEY` for AI triage
+- Without secrets the workflow **skips** deploy (warning only); game shows Bug 監測「未連線」 and works offline
+
 ### Stripe live payments
 
 - Config in `index.html`: `PAYMENT_CONFIG` (`mode`, `pkLive`, `pkTest`, `verifyEndpoint`, `allowLiveTrustRedirect`)
