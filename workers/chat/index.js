@@ -8,7 +8,7 @@
  * Set CHAT_CONFIG.endpoint in index.html to:
  *   https://muxtext-chat.<your-subdomain>.workers.dev
  */
-const MAX_MESSAGES = 100;
+const MAX_MESSAGES = 5000;
 const MAX_TEXT = 200;
 const MAX_USER = 32;
 const MAX_LEVEL = 99999;
