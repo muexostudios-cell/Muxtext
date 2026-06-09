@@ -63,8 +63,12 @@ const cases = [
   ['buckler shield', () => sandbox.getEquipPixelIconUrl({ name: 'BUCKLER', type: 'offhand', rarity: 'rare' })],
   ['iron plate armor', () => sandbox.getEquipPixelIconUrl({ name: 'IRON_PLATE', type: 'armor', rarity: 'epic' })],
   ['space stone crystal', () => sandbox.getItemPixelIconUrl('spaceStone')],
-  ['item bag stone', () => sandbox.getItemPixelIconUrl('itemBagStone')]
+  ['item bag stone crystal', () => sandbox.getItemPixelIconUrl('itemBagStone')]
 ];
+
+const spaceUrl = sandbox.getItemPixelIconUrl('spaceStone');
+const bagUrl = sandbox.getItemPixelIconUrl('itemBagStone');
+if (spaceUrl !== bagUrl) throw new Error('spaceStone and itemBagStone icons should match');
 
 for (const [label, fn] of cases) {
   const url = fn();
