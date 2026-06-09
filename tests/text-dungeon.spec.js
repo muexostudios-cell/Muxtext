@@ -8,12 +8,12 @@ async function completeBootAndRegister(page) {
   await expect(page.locator('#loading-overlay')).toBeVisible();
   await expect(page.locator('#account-overlay')).toBeVisible({ timeout: 10000 });
 
-  const user = `pixel_${Date.now()}`;
+  const user = `text_${Date.now()}`;
   await page.locator('#account-tab-register').click();
   await page.locator('#account-username').fill(user);
   await page.locator('#account-password').fill('test1234');
   await page.locator('#account-password-confirm').fill('test1234');
-  await page.locator('#account-display-input').fill('PixelTester');
+  await page.locator('#account-display-input').fill('TextTester');
   await page.locator('#account-submit').click();
 
   const confirm = page.locator('#confirm-overlay');
@@ -36,7 +36,7 @@ async function enterManualDungeon(page) {
   await expect(page.locator('#map .cell')).toHaveCount(49, { timeout: 15000 });
 }
 
-test('dungeon map uses pixel cyber tiles and player glyph', async ({ page }) => {
+test('dungeon map uses plain text cells and player glyph', async ({ page }) => {
   test.setTimeout(120000);
   await page.addInitScript(() => {
     localStorage.clear();
@@ -48,38 +48,39 @@ test('dungeon map uses pixel cyber tiles and player glyph', async ({ page }) => 
 
   const layout = await page.evaluate(() => {
     const cells = Array.from(document.querySelectorAll('#map .cell'));
-    const withTile = cells.filter((el) => el.querySelector('.cell-pixel img.pixel-icon'));
     const player = cells.find((el) => el.textContent.includes('@'));
-    const mobWrap = cells.find((el) => el.querySelector('.cell-mob .pixel-icon-wrap, .cell-mob .pixel-icon'));
-    const mapTray = getComputedStyle(document.getElementById('map'));
-    const cell = getComputedStyle(cells[0]);
-    const parseLum = (css) => {
-      const m = css.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-      if (!m) return 0;
-      const [r, g, b] = m.slice(1, 4).map(Number);
-      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-    };
     const mapEl = document.getElementById('map');
-    const sampleCell = cells[0];
+    const pixelNodes = cells.filter((el) =>
+      el.querySelector('.cell-pixel, .cell-mob, img.pixel-icon, .pixel-icon-wrap'),
+    );
+    const cellsWithChildren = cells.filter((el) => el.children.length > 0);
+    const tileClassCells = cells.filter((el) =>
+      Array.from(el.classList).some((name) => name.startsWith('tile-')),
+    );
+    const glyphs = cells.map((el) => el.textContent.trim()).filter(Boolean);
+    const cell = getComputedStyle(cells[0]);
     return {
-      tileCount: withTile.length,
+      pixelNodeCount: pixelNodes.length,
+      childCellCount: cellsWithChildren.length,
+      tileClassCount: tileClassCells.length,
       hasPlayer: !!player,
-      hasMobIcon: !!mobWrap,
       hasVisitedTiles: cells.some((el) => el.classList.contains('tile-visited') || el.classList.contains('visited')),
-      hasMonsterTiles: cells.some((el) => el.classList.contains('tile-monster')),
+      hasDungeonGlyphs: glyphs.length > 0,
+      hasEnemyPortrait: !!document.getElementById('enemy-portrait'),
+      mapIsGrid: getComputedStyle(mapEl).display === 'grid',
       mapGapNotPixelated: getComputedStyle(mapEl).backgroundImage === 'none',
-      cellClipped: getComputedStyle(sampleCell).overflow === 'hidden',
-      mapHasCyberBg: getComputedStyle(document.getElementById('map-container')).backgroundImage !== 'none',
-      cellBorderLum: parseLum(cell.borderTopColor),
-      mapTrayBorderLum: parseLum(mapTray.borderTopColor),
+      cellUsesTextLayout: cell.display === 'flex',
     };
   });
 
-  expect(layout.tileCount).toBeGreaterThan(40);
+  expect(layout.pixelNodeCount).toBe(0);
+  expect(layout.childCellCount).toBe(0);
+  expect(layout.tileClassCount).toBe(0);
   expect(layout.hasPlayer).toBe(true);
+  expect(layout.hasDungeonGlyphs).toBe(true);
   expect(layout.hasVisitedTiles).toBe(true);
+  expect(layout.hasEnemyPortrait).toBe(false);
+  expect(layout.mapIsGrid).toBe(true);
   expect(layout.mapGapNotPixelated).toBe(true);
-  expect(layout.cellClipped).toBe(true);
-  expect(layout.mapHasCyberBg).toBe(true);
-  expect(layout.cellBorderLum).toBeGreaterThan(layout.mapTrayBorderLum);
+  expect(layout.cellUsesTextLayout).toBe(true);
 });
