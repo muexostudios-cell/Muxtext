@@ -61,7 +61,9 @@ const cases = [
   ['hidden scythe', () => sandbox.getEquipPixelIconUrl({ name: 'VOID_REAPER', type: 'mainhand', rarity: 'hidden' })],
   ['plasma gun', () => sandbox.getEquipPixelIconUrl({ name: 'PLASMA_GUN', type: 'mainhand', rarity: 'rare' })],
   ['buckler shield', () => sandbox.getEquipPixelIconUrl({ name: 'BUCKLER', type: 'offhand', rarity: 'rare' })],
-  ['iron plate armor', () => sandbox.getEquipPixelIconUrl({ name: 'IRON_PLATE', type: 'armor', rarity: 'epic' })]
+  ['iron plate armor', () => sandbox.getEquipPixelIconUrl({ name: 'IRON_PLATE', type: 'armor', rarity: 'epic' })],
+  ['space stone crystal', () => sandbox.getItemPixelIconUrl('spaceStone')],
+  ['item bag stone', () => sandbox.getItemPixelIconUrl('itemBagStone')]
 ];
 
 for (const [label, fn] of cases) {
@@ -71,7 +73,7 @@ for (const [label, fn] of cases) {
 }
 
 const legendaryHtml = sandbox.getEquipPixelIconHtml({ name: 'VOID_REAPER', type: 'mainhand', rarity: 'legendary' }, 22);
-if (!legendaryHtml.includes('pixel-icon-wrap') || !legendaryHtml.includes('pixel-spark')) {
+if (!legendaryHtml.includes('pixel-icon-wrap') || !legendaryHtml.includes('pixel-spark p4')) {
   throw new Error('legendary particle wrap missing');
 }
 console.log('legendary particle wrap ok');
