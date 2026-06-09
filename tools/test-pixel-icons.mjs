@@ -82,4 +82,16 @@ if (!legendaryHtml.includes('pixel-icon-wrap') || !legendaryHtml.includes('pixel
 }
 console.log('legendary particle wrap ok');
 
+for (const id of ['equipFragment', 'advancedEquipFragment', 'legendaryEquipFragment', 'hiddenEquipFragment']) {
+  const url = sandbox.getItemPixelIconUrl(id);
+  if (!url || !url.startsWith('data:image/png')) throw new Error('bad fragment url: ' + id);
+  console.log('fragment', id, 'ok');
+}
+const legFragHtml = sandbox.getItemPixelIconHtml('legendaryEquipFragment', 22);
+const hidFragHtml = sandbox.getItemPixelIconHtml('hiddenEquipFragment', 22);
+if (!legFragHtml.includes('rarity-legendary') || !hidFragHtml.includes('rarity-hidden')) {
+  throw new Error('fragment particle wrap missing');
+}
+console.log('fragment particle wraps ok');
+
 console.log('Pixel icon tests passed');
