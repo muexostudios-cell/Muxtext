@@ -19,15 +19,14 @@ test.describe('chat layout', () => {
     await dismissBootOverlays(page);
   });
 
-  test('mobile overlay fits viewport and scrolls messages', async ({ page }) => {
+  test('mobile embedded chat fits viewport and scrolls messages', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await dismissBootOverlays(page);
 
     await page.evaluate(() => document.getElementById('btn-chat').click());
-    await expect(page.locator('#chat-overlay')).toHaveClass(/open/);
-    await expect(page.locator('#chat-overlay')).toBeVisible();
+    await expect(page.locator('#chat-embedded')).toHaveClass(/show/);
 
-    const panelBox = await page.locator('#chat-overlay #chat-panel').boundingBox();
+    const panelBox = await page.locator('#chat-embedded #chat-panel').boundingBox();
     expect(panelBox).toBeTruthy();
     expect(panelBox.y + panelBox.height).toBeLessThanOrEqual(844 + 2);
 
@@ -50,8 +49,8 @@ test.describe('chat layout', () => {
     });
     expect(scrollable).toBe(true);
 
-    await page.evaluate(() => document.getElementById('btn-close-chat').click());
-    await expect(page.locator('#chat-overlay')).toBeHidden();
+    await page.evaluate(() => document.getElementById('btn-chat').click());
+    await expect(page.locator('#chat-embedded')).not.toHaveClass(/show/);
   });
 
   test('large text size keeps chat controls visible', async ({ page }) => {
@@ -74,19 +73,19 @@ test.describe('chat layout', () => {
     await page.evaluate(() => document.getElementById('btn-chat').click());
 
     const layout = await page.evaluate(() => {
-      const panel = document.querySelector('#chat-overlay #chat-panel');
+      const panel = document.querySelector('#chat-embedded #chat-panel');
       const input = document.getElementById('chat-input-row');
-      const close = document.getElementById('btn-close-chat');
+      const tabBar = document.getElementById('tab-bar');
       const pr = panel.getBoundingClientRect();
       const ir = input.getBoundingClientRect();
-      const cr = close.getBoundingClientRect();
+      const tr = tabBar.getBoundingClientRect();
       return {
         textScale: getComputedStyle(document.documentElement).getPropertyValue('--chat-text-scale').trim(),
         panelH: getComputedStyle(document.documentElement).getPropertyValue('--chat-panel-h').trim(),
         panelFits: pr.bottom <= window.innerHeight + 2,
         inputInPanel: ir.bottom <= pr.bottom + 1,
-        closeInPanel: cr.bottom <= pr.bottom + 1,
-        chatRootFont: getComputedStyle(document.getElementById('chat-overlay')).fontSize,
+        tabBelowChat: tr.top >= pr.bottom - 2,
+        chatRootFont: getComputedStyle(document.getElementById('chat-embedded')).fontSize,
       };
     });
 
@@ -94,7 +93,7 @@ test.describe('chat layout', () => {
     expect(parseInt(layout.panelH, 10)).toBeGreaterThan(400);
     expect(layout.panelFits).toBe(true);
     expect(layout.inputInPanel).toBe(true);
-    expect(layout.closeInPanel).toBe(true);
+    expect(layout.tabBelowChat).toBe(true);
     expect(parseFloat(layout.chatRootFont)).toBeGreaterThan(20);
   });
 
@@ -103,7 +102,7 @@ test.describe('chat layout', () => {
     await dismissBootOverlays(page);
 
     await page.evaluate(() => document.getElementById('btn-chat').click());
-    await expect(page.locator('#chat-overlay')).toHaveClass(/open/);
+    await expect(page.locator('#chat-embedded')).toHaveClass(/show/);
 
     await page.setViewportSize({ width: 390, height: 680 });
     await page.evaluate(() => {
@@ -111,8 +110,41 @@ test.describe('chat layout', () => {
       if (window.visualViewport) window.visualViewport.dispatchEvent(new Event('resize'));
     });
 
-    await expect(page.locator('#chat-overlay')).toHaveClass(/open/);
-    await expect(page.locator('#chat-overlay')).toBeVisible();
+    await expect(page.locator('#chat-embedded')).toHaveClass(/show/);
+  });
+
+  test('mobile tab bar stays below chat panel', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await dismissBootOverlays(page);
+
+    await page.evaluate(() => document.getElementById('btn-chat').click());
+    await expect(page.locator('#chat-embedded')).toHaveClass(/show/);
+
+    const layout = await page.evaluate(() => {
+      const tabBar = document.getElementById('tab-bar');
+      const chat = document.getElementById('chat-embedded');
+      const input = document.getElementById('chat-input-row');
+      const main = document.getElementById('game-main');
+      const tabRect = tabBar.getBoundingClientRect();
+      const chatRect = chat.getBoundingClientRect();
+      const inputRect = input.getBoundingClientRect();
+      const mainRect = main.getBoundingClientRect();
+      const tabIndex = Array.from(main.children).indexOf(tabBar);
+      const chatIndex = Array.from(main.children).indexOf(chat);
+      return {
+        tabBelowChat: tabRect.top >= chatRect.bottom - 2,
+        tabNearBottom: tabRect.bottom >= mainRect.bottom - 4,
+        inputAboveTab: inputRect.bottom <= tabRect.top + 2,
+        tabIsLast: tabIndex === main.children.length - 1,
+        tabAfterChat: chatIndex >= 0 && tabIndex > chatIndex,
+      };
+    });
+
+    expect(layout.tabAfterChat).toBe(true);
+    expect(layout.tabIsLast).toBe(true);
+    expect(layout.tabBelowChat).toBe(true);
+    expect(layout.tabNearBottom).toBe(true);
+    expect(layout.inputAboveTab).toBe(true);
   });
 
   test('desktop shows chat in panel sidebar', async ({ page }) => {
