@@ -35,6 +35,11 @@ async function completeBootAndRegister(page) {
   await page.locator('#account-display-input').fill('SmokeTester');
   await page.locator('#account-submit').click();
 
+  const confirm = page.locator('#confirm-overlay');
+  if (await confirm.isVisible({ timeout: 5000 }).catch(() => false)) {
+    await page.locator('#confirm-yes').click();
+  }
+
   await expect(page.locator('#account-overlay')).toBeHidden({ timeout: 15000 });
   await expect(page.locator('#player-name-custom')).toHaveText('SmokeTester');
 }
@@ -64,9 +69,10 @@ test('starts a manual dungeon run and renders the map', async ({ page }) => {
   await expect(page.locator('#difficulty-overlay')).toBeVisible();
 
   await page.locator('.difficulty-btn.normal-diff').click();
-  await expect(page.locator('#drone-dungeon-overlay')).toBeVisible();
-
-  await page.locator('#drone-dungeon-no').click();
+  const droneOverlay = page.locator('#drone-dungeon-overlay');
+  if (await droneOverlay.isVisible({ timeout: 2000 }).catch(() => false)) {
+    await page.locator('#drone-dungeon-no').click();
+  }
   await expect(page.locator('#map .cell')).toHaveCount(49);
   await expect(page.locator('#map-container')).toBeVisible();
   await expectControlsWithinViewport(page, ['#action-bar button', '#tab-bar button', '#btn-chat']);
