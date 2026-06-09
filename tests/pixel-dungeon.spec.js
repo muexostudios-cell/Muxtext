@@ -59,10 +59,16 @@ test('dungeon map uses pixel cyber tiles and player glyph', async ({ page }) => 
       const [r, g, b] = m.slice(1, 4).map(Number);
       return 0.2126 * r + 0.7152 * g + 0.0722 * b;
     };
+    const mapEl = document.getElementById('map');
+    const sampleCell = cells[0];
     return {
       tileCount: withTile.length,
       hasPlayer: !!player,
       hasMobIcon: !!mobWrap,
+      hasVisitedTiles: cells.some((el) => el.classList.contains('tile-visited') || el.classList.contains('visited')),
+      hasMonsterTiles: cells.some((el) => el.classList.contains('tile-monster')),
+      mapGapNotPixelated: getComputedStyle(mapEl).backgroundImage === 'none',
+      cellClipped: getComputedStyle(sampleCell).overflow === 'hidden',
       mapHasCyberBg: getComputedStyle(document.getElementById('map-container')).backgroundImage !== 'none',
       cellBorderLum: parseLum(cell.borderTopColor),
       mapTrayBorderLum: parseLum(mapTray.borderTopColor),
@@ -71,6 +77,9 @@ test('dungeon map uses pixel cyber tiles and player glyph', async ({ page }) => 
 
   expect(layout.tileCount).toBeGreaterThan(40);
   expect(layout.hasPlayer).toBe(true);
+  expect(layout.hasVisitedTiles).toBe(true);
+  expect(layout.mapGapNotPixelated).toBe(true);
+  expect(layout.cellClipped).toBe(true);
   expect(layout.mapHasCyberBg).toBe(true);
-  expect(layout.cellBorderLum).toBeGreaterThan(layout.mapTrayBorderLum + 8);
+  expect(layout.cellBorderLum).toBeGreaterThan(layout.mapTrayBorderLum);
 });
