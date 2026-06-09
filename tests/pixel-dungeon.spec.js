@@ -51,15 +51,26 @@ test('dungeon map uses pixel cyber tiles and player glyph', async ({ page }) => 
     const withTile = cells.filter((el) => el.querySelector('.cell-pixel img.pixel-icon'));
     const player = cells.find((el) => el.textContent.includes('@'));
     const mobWrap = cells.find((el) => el.querySelector('.cell-mob .pixel-icon-wrap, .cell-mob .pixel-icon'));
+    const mapTray = getComputedStyle(document.getElementById('map'));
+    const cell = getComputedStyle(cells[0]);
+    const parseLum = (css) => {
+      const m = css.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+      if (!m) return 0;
+      const [r, g, b] = m.slice(1, 4).map(Number);
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    };
     return {
       tileCount: withTile.length,
       hasPlayer: !!player,
       hasMobIcon: !!mobWrap,
       mapHasCyberBg: getComputedStyle(document.getElementById('map-container')).backgroundImage !== 'none',
+      cellBorderLum: parseLum(cell.borderTopColor),
+      mapTrayBorderLum: parseLum(mapTray.borderTopColor),
     };
   });
 
   expect(layout.tileCount).toBeGreaterThan(40);
   expect(layout.hasPlayer).toBe(true);
   expect(layout.mapHasCyberBg).toBe(true);
+  expect(layout.cellBorderLum).toBeGreaterThan(layout.mapTrayBorderLum + 8);
 });
