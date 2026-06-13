@@ -1018,141 +1018,108 @@ window.addEventListener('load', function(){
     legendary:{zh:'傳說',en:'Legendary'}
   };
 
-  // Wait until the game's ITEMS global is available, then inject.
-  function _tryInject(){
-    if(typeof ITEMS === 'undefined' || typeof ITEM_DISPLAY_ORDER === 'undefined'){
-      return setTimeout(_tryInject, 200);
-    }
-    PET_TYPES.forEach(function(def){
-      const id = 'petEgg_' + def.id;
-      ITEMS[id] = {
-        id,
-        type:     'petEgg',
-        rarity:   def.rarity,
-        nameZh:   def.nameZh + '蛋',
-        nameEn:   def.nameEn + ' Egg',
-        descZh:   `[${_eggRarityLabel[def.rarity].zh}] ${def.elem||''} 孵化後獲得 ${def.nameZh}。點擊孵化。`,
-        descEn:   `[${_eggRarityLabel[def.rarity].en}] ${def.elem||''} Hatches into ${def.nameEn}. Tap to hatch.`,
-        color:    _eggRarityColor[def.rarity] || '#aaa',
-        icon:     '🥚',
-        stackable: false,
-        typeId:   def.id
-      };
-      // Insert into display order at front (so eggs appear near the top of inventory)
-      if(!ITEM_DISPLAY_ORDER.includes(id)){
-        ITEM_DISPLAY_ORDER.unshift(id);
-      }
-    });
-    _patchItemFunctions();
-    console.log('[PET SYSTEM] petEgg items registered in ITEMS table');
-  }
-  _tryInject();
+  // Immediately patch item functions (ITEMS/ITEM_DISPLAY_ORDER may be scoped inside
+  // the game's closure so we can't rely on them — we use direct renderInventoryPanel
+  // monkey-patching instead for robust display).
+  _patchItemFunctions();
+  console.log('[PET SYSTEM] petEgg inventory patches applied');
 
   function _patchItemFunctions(){
-    // ── Patch getItemName ──────────────────────────────────────────────────
-    if(typeof getItemName === 'function'){
-      const _orig_getItemName = getItemName;
-      getItemName = function(itemId, lang){
-        if(typeof itemId === 'string' && itemId.startsWith('petEgg_')){
-          const it = ITEMS[itemId];
-          if(!it) return itemId;
-          return (lang||currentLang)==='zh' ? it.nameZh : it.nameEn;
-        }
-        return _orig_getItemName.apply(this, arguments);
+    // ── Helper: build the hatch action overlay ─────────────────────────────
+    function _showPetEggAction(typeId){
+      const def = getPetTypeDef(typeId);
+      const nm = (currentLang==='zh') ? def.nameZh : def.nameEn;
+      const rc = RARITY_COLORS_PET[def.rarity] || '#aaa';
+      const rarityLabel = {common:'普通',rare:'稀有',epic:'史詩',legendary:'傳說'}[def.rarity]||def.rarity;
+      const petState = player && player.pet;
+      const hasPet = petState && petState.owned;
+      const existingOverlay = document.getElementById('petEggActionOverlay');
+      if(existingOverlay) existingOverlay.remove();
+      const overlay = document.createElement('div');
+      overlay.id = 'petEggActionOverlay';
+      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:400;display:flex;align-items:center;justify-content:center;';
+      const qty = getItemQty('petEgg_' + typeId);
+      overlay.innerHTML = `
+        <div style="background:#1a1a2e;border:1px solid ${rc};border-radius:8px;padding:1rem;min-width:200px;max-width:280px;text-align:center;">
+          <div style="font-size:1.5rem;margin-bottom:0.3rem;">🥚</div>
+          <div style="color:${rc};font-weight:bold;font-size:0.75rem;margin-bottom:0.2rem;">${nm}蛋</div>
+          <div style="color:#888;font-size:0.55rem;margin-bottom:0.5rem;">${currentLang==='zh'?`稀有度：${rarityLabel}`:'Rarity: '+def.rarity} ${def.elem||''}</div>
+          <div style="color:#666;font-size:0.5rem;margin-bottom:0.8rem;">x${qty}</div>
+          ${hasPet
+            ? `<div style="color:#ff8888;font-size:0.6rem;margin-bottom:0.8rem;">${currentLang==='zh'?'你已有寵物，請先放棄再孵化。':'You already have a pet. Release it first.'}</div>`
+            : `<button onclick="document.getElementById('petEggActionOverlay').remove();hatchPetEgg('${typeId}');"
+                style="width:100%;background:#1a2a1a;border:1px solid #44aa44;color:#88ff88;font-size:0.65rem;padding:0.4rem 0;cursor:pointer;border-radius:5px;margin-bottom:0.4rem;">
+                🐣 ${currentLang==='zh'?'孵化寵物蛋':'Hatch Egg'}
+              </button>`
+          }
+          <button onclick="document.getElementById('petEggActionOverlay').remove();"
+            style="width:100%;background:#1a1a1a;border:1px solid #444;color:#888;font-size:0.6rem;padding:0.3rem 0;cursor:pointer;border-radius:5px;">
+            ${currentLang==='zh'?'取消':'Cancel'}
+          </button>
+        </div>`;
+      overlay.addEventListener('pointerdown', function(e){
+        if(e.target === overlay) overlay.remove();
+      });
+      document.body.appendChild(overlay);
+    }
+
+    // ── Patch renderInventoryPanel ─────────────────────────────────────────
+    // We append petEgg items AFTER the original function runs, bypassing any
+    // ITEM_DISPLAY_ORDER scope issues entirely.
+    if(typeof renderInventoryPanel === 'function'){
+      const _orig_renderInventoryPanel = renderInventoryPanel;
+      renderInventoryPanel = function(){
+        _orig_renderInventoryPanel.apply(this, arguments);
+        _appendPetEggSlots();
       };
     }
 
-    // ── Patch getItemDesc ──────────────────────────────────────────────────
-    if(typeof getItemDesc === 'function'){
-      const _orig_getItemDesc = getItemDesc;
-      getItemDesc = function(itemId, lang){
-        if(typeof itemId === 'string' && itemId.startsWith('petEgg_')){
-          const it = ITEMS[itemId];
-          if(!it) return '';
-          return (lang||currentLang)==='zh' ? it.descZh : it.descEn;
-        }
-        return _orig_getItemDesc.apply(this, arguments);
+    function _appendPetEggSlots(){
+      // 'item-grid' is the confirmed element id used by the game's inventory panel
+      const itemGrid = document.getElementById('item-grid');
+      if(!itemGrid) return;
+
+      // Remove any previously-appended petEgg slots so we don't duplicate
+      itemGrid.querySelectorAll('.pet-egg-slot').forEach(el=>el.remove());
+
+      const petEggAdded = [];
+      PET_TYPES.forEach(function(def){
+        const itemId = 'petEgg_' + def.id;
+        const qty = getItemQty(itemId);
+        if(qty <= 0) return;
+        petEggAdded.push({def, itemId, qty});
+      });
+      if(petEggAdded.length === 0) return;
+
+      petEggAdded.forEach(function({def, itemId, qty}){
+        const rc = RARITY_COLORS_PET[def.rarity] || '#aaa';
+        const nm = (currentLang==='zh') ? def.nameZh : def.nameEn;
+        const div = document.createElement('div');
+        div.className = 'equip-slot pet-egg-slot';
+        div.style.cssText = `border-color:${rc}88;cursor:pointer;`;
+        div.innerHTML = `<span class="item-entry-row"><span style="font-size:1.1rem;line-height:1;margin-right:4px;">🥚</span><span class="item-entry-text"><b style="color:${rc}">${nm}蛋</b> <span style="color:#666;">x${qty}</span></span></span>`;
+        div.addEventListener('click', function(){ _showPetEggAction(def.id); });
+        itemGrid.appendChild(div);
+      });
+    }
+
+    // ── Patch applyDevAccountBootstrap ────────────────────────────────────
+    // This is called right after initGame() loads the player save — the most
+    // reliable moment to grant dev eggs.
+    if(typeof applyDevAccountBootstrap === 'function'){
+      const _orig_applyDevAccountBootstrap = applyDevAccountBootstrap;
+      applyDevAccountBootstrap = function(){
+        _orig_applyDevAccountBootstrap.apply(this, arguments);
+        setTimeout(function(){
+          const n = grantDevPetEggs();
+          if(n > 0){
+            console.log('[PET SYSTEM] Dev eggs granted via applyDevAccountBootstrap:', n);
+            if(typeof renderInventoryPanel === 'function') renderInventoryPanel();
+          }
+        }, 50);
       };
     }
 
-    // ── Patch getItemColor ─────────────────────────────────────────────────
-    if(typeof getItemColor === 'function'){
-      const _orig_getItemColor = getItemColor;
-      getItemColor = function(itemId){
-        if(typeof itemId === 'string' && itemId.startsWith('petEgg_')){
-          const it = ITEMS[itemId];
-          return it ? it.color : '#aaa';
-        }
-        return _orig_getItemColor.apply(this, arguments);
-      };
-    }
-
-    // ── Patch getItemIconRarity (icon/emoji displayed in slot) ────────────
-    if(typeof getItemIconRarity === 'function'){
-      const _orig_getItemIconRarity = getItemIconRarity;
-      getItemIconRarity = function(itemId){
-        if(typeof itemId === 'string' && itemId.startsWith('petEgg_')){
-          return '🥚';
-        }
-        return _orig_getItemIconRarity.apply(this, arguments);
-      };
-    }
-
-    // ── Patch getItemTypeClass (CSS class used for rarity border glow) ────
-    if(typeof getItemTypeClass === 'function'){
-      const _orig_getItemTypeClass = getItemTypeClass;
-      getItemTypeClass = function(itemId){
-        if(typeof itemId === 'string' && itemId.startsWith('petEgg_')){
-          const it = ITEMS[itemId];
-          return it ? ('item-rarity-' + it.rarity) : 'item-rarity-common';
-        }
-        return _orig_getItemTypeClass.apply(this, arguments);
-      };
-    }
-
-    // ── Patch showItemAction (action popup when player taps item) ─────────
-    if(typeof showItemAction === 'function'){
-      const _orig_showItemAction = showItemAction;
-      showItemAction = function(itemId){
-        if(typeof itemId === 'string' && itemId.startsWith('petEgg_')){
-          const typeId = itemId.replace('petEgg_', '');
-          const def = getPetTypeDef(typeId);
-          const nm = (currentLang==='zh') ? def.nameZh : def.nameEn;
-          const rc = RARITY_COLORS_PET[def.rarity] || '#aaa';
-          const petState = player && player.pet;
-          const hasPet = petState && petState.owned;
-          // Build a small action panel in the style of the game's item actions
-          const existingOverlay = document.getElementById('petEggActionOverlay');
-          if(existingOverlay) existingOverlay.remove();
-          const overlay = document.createElement('div');
-          overlay.id = 'petEggActionOverlay';
-          overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:400;display:flex;align-items:center;justify-content:center;';
-          overlay.innerHTML = `
-            <div style="background:#1a1a2e;border:1px solid ${rc};border-radius:8px;padding:1rem;min-width:200px;max-width:280px;text-align:center;">
-              <div style="font-size:1.5rem;margin-bottom:0.3rem;">🥚</div>
-              <div style="color:${rc};font-weight:bold;font-size:0.75rem;margin-bottom:0.2rem;">${nm}蛋</div>
-              <div style="color:#888;font-size:0.55rem;margin-bottom:0.8rem;">${currentLang==='zh'?'稀有度：'+{common:'普通',rare:'稀有',epic:'史詩',legendary:'傳說'}[def.rarity]:'Rarity: '+def.rarity} ${def.elem||''}</div>
-              ${hasPet
-                ? `<div style="color:#ff8888;font-size:0.6rem;margin-bottom:0.8rem;">${currentLang==='zh'?'你已有寵物，請先放棄再孵化。':'You already have a pet. Release it first.'}</div>`
-                : `<button onclick="document.getElementById('petEggActionOverlay').remove();hatchPetEgg('${typeId}');"
-                    style="width:100%;background:#1a2a1a;border:1px solid #44aa44;color:#88ff88;font-size:0.65rem;padding:0.4rem 0;cursor:pointer;border-radius:5px;margin-bottom:0.4rem;">
-                    🐣 ${currentLang==='zh'?'孵化寵物蛋':'Hatch Egg'}
-                  </button>`
-              }
-              <button onclick="document.getElementById('petEggActionOverlay').remove();"
-                style="width:100%;background:#1a1a1a;border:1px solid #444;color:#888;font-size:0.6rem;padding:0.3rem 0;cursor:pointer;border-radius:5px;">
-                ${currentLang==='zh'?'取消':'Cancel'}
-              </button>
-            </div>`;
-          overlay.addEventListener('pointerdown', function(e){
-            if(e.target === overlay) overlay.remove();
-          });
-          document.body.appendChild(overlay);
-          return;
-        }
-        return _orig_showItemAction.apply(this, arguments);
-      };
-    }
   } // end _patchItemFunctions
 })();
 
