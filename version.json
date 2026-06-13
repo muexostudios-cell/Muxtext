@@ -1,7 +1,7 @@
 {
-  "version": "2.25.19",
+  "version": "2.25.20",
   "updated": "2026-06-13",
   "changes": [
-    "撤回 2.25.18 錯誤修改（地圖/日誌）"
+    "修復：tab-bar 移除 align-items:stretch，按鈕不再被拉伸，消除文字上下空白"
   ]
 }
