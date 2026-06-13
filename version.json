@@ -1,10 +1,9 @@
 {
-  "version": "2.25.6",
+  "version": "2.25.7",
   "updated": "2026-06-13",
   "releaseDate": "2026-06-13",
   "changes": [
-    "修復：攻擊按鈕在戰鬥中消失（getCachedPixelIcon加try-catch防止icon崩潰阻塞UI）",
-    "修復：裝備頁面槽位空白（同上，equipToString不再因icon崩潰中斷）",
-    "修復：底部導覽列退出裝備面板時位置偏移（combat-layout tab-bar加margin-top:auto）"
+    "修復：裝備按鈕像素圖示在地下城戰鬥畫面中只顯示「--」（新增缺失的 getEquipPixelIconUrl 函數）",
+    "修復：背包裝備物品無法正常顯示（equipToString 因 getEquipPixelIconUrl 未定義而拋出異常）"
   ]
 }
