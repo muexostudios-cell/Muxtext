@@ -1,9 +1,1 @@
-{
-  "version": "2.25.29",
-  "updated": "2026-06-13",
-  "changes": [
-    "修復：聊天室 / 切換頁籤後下方出現空白位置",
-    "action-bar 無顯示按鈕時自動隱藏（:not(:has(.show))）",
-    "聊天室開啟時 tab-bar margin-top 清零，緊貼 chat panel 底部"
-  ]
-}
+{"version":"2.25.30","date":"2026-06-13"}
