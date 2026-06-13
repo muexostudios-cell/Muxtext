@@ -1,11 +1,12 @@
 {
-  "version": "2.25.4",
+  "version": "2.25.5",
   "updated": "2026-06-13",
   "releaseDate": "2026-06-13",
   "changes": [
-    "Redesigned all equipment slot pixel icons to 42×42px",
-    "Detailed art per slot: sword/gun/hammer/scythe/dagger",
-    "Shield/fist/armor/armguard/legguard/boots unique designs",
-    "Rarity particle effects updated for 42×42 canvas"
+    "Redesigned all 16 item pixel icons to 42x42px",
+    "Herbs: detailed syringe with glass barrel + graduation marks",
+    "Gems: diamond-cut faceted gemstones per rarity",
+    "Fragments: polygon shard with crack lines + rarity particles",
+    "Other: flame ticket, crystal, crate, decoder key, rename card"
   ]
 }
