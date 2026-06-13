@@ -1,9 +1,9 @@
 {
-  "version": "2.25.21",
+  "version": "2.25.22",
   "updated": "2026-06-13",
   "changes": [
-    "修復：tab-bar 基礎改為 align-items:flex-end，所有模式按鈕不再拉伸",
-    "修復：按鈕 padding-top=0，文字貼底，移除空白",
-    "修復：戰鬥模式 tab-bar 加 margin-top:auto 確保在畫面最底"
+    "修復：移除戰鬥介面 tab bar 下方的空白區域",
+    "修復：隱藏 [離開] 和 [重新開始] 按鈕（保留 DOM 節點避免 JS 報錯）",
+    "修復：隱藏 combat layout 中空的 action-bar 容器"
   ]
 }
