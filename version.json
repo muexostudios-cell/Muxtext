@@ -1,7 +1,9 @@
 {
-  "version": "2.25.20",
+  "version": "2.25.21",
   "updated": "2026-06-13",
   "changes": [
-    "修復：tab-bar 移除 align-items:stretch，按鈕不再被拉伸，消除文字上下空白"
+    "修復：tab-bar 基礎改為 align-items:flex-end，所有模式按鈕不再拉伸",
+    "修復：按鈕 padding-top=0，文字貼底，移除空白",
+    "修復：戰鬥模式 tab-bar 加 margin-top:auto 確保在畫面最底"
   ]
 }
