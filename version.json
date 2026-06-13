@@ -1,9 +1,8 @@
 {
-  "version": "2.25.11",
+  "version": "2.25.12",
   "updated": "2026-06-13",
   "releaseDate": "2026-06-13",
   "changes": [
-    "修復：怪物觸發閃避後攻擊按鈕長期鎖定 — processAttackQueue 隊列清空時補充 updateButtons() 呼叫",
-    "修復：Boss 血量條顏色改為紅色（與普通敵人一致，使用 var(--hp)）"
+    "介面優化：底部五個按鈕更貼近手機屏幕底部（safe-area 由 body 移至 tab-bar 處理）"
   ]
 }
