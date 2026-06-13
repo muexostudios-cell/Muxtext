@@ -316,7 +316,702 @@ function shouldShowPlayerXpStrip(){if(player.isPermanentlyDead)return false;if(c
 
 let currentShopView='menu';const PAYMENT_CONFIG={mode:'live',pkLive:'pk_live_51Tfd4l2K5ri8hMuiq6srt2f9DoN4bnjbT43uLgD07GklFWuNrm4gXaQpaiN2yuFvCTqOxV5wIhfZiHt19oZhdCHN00jA1GJ4lj',pkTest:'pk_test_51Tfd5tRxASemzlh4o3cbhSgz9FrAT303QGJTYF5TNGKIuM45bkrv3E0VFhzrhu1towwZHEu1c1pEdk3OGAJndbrQ007V5NlJfH',verifyEndpoint:'',allowDevFallback:false,allowLiveTrustRedirect:false};function isLocalDevHost(){const h=location.hostname;return h==='localhost'||h==='127.0.0.1'||h==='';}function getPaymentMode(){if(PAYMENT_CONFIG.mode==='live'&&!isLocalDevHost())return 'live';if(PAYMENT_CONFIG.mode==='live'&&isLocalDevHost())return 'test';return PAYMENT_CONFIG.mode==='live'?'live':'test';}function isLivePayment(){return getPaymentMode()==='live';}function getStripePublishableKey(){return isLivePayment()?(PAYMENT_CONFIG.pkLive||''):PAYMENT_CONFIG.pkTest;}function getPkgStripeLink(pkg){return isLivePayment()?(pkg.stripeLinkLive||''):(pkg.stripeLinkTest||pkg.stripeLink||'');}function requiresPaymentVerification(){return isLivePayment()&&!!PAYMENT_CONFIG.verifyEndpoint;}const OVERLOAD_CHIP_PACKAGES=[{id:'chip60',chips:60,priceLabel:'HK$8',priceHkd:8,stripeLinkTest:'https://buy.stripe.com/test_5kQ4gB2SMbv3gSBc1n8og00',stripeLinkLive:'https://buy.stripe.com/3cIdR26z9gF7fCb2vp0VO04',stripePriceId:''},{id:'chip300',chips:300,priceLabel:'HK$38',priceHkd:38,stripeLinkTest:'https://buy.stripe.com/test_dRm8wR0KE42B6dX1mJ8og01',stripeLinkLive:'https://buy.stripe.com/14AbIUe1B2Oh9dN4Dx0VO05',stripePriceId:''},{id:'chip680',chips:680,priceLabel:'HK$78',priceHkd:78,stripeLinkTest:'https://buy.stripe.com/test_28E3cxgJC42B9q9d5r8og02',stripeLinkLive:'https://buy.stripe.com/7sYeV69LlfB39dNgmf0VO06',stripePriceId:''},{id:'chip1280',chips:1280,priceLabel:'HK$148',priceHkd:148,stripeLinkTest:'https://buy.stripe.com/test_eVqbJ3fFycz7eKt1mJ8og03',stripeLinkLive:'https://buy.stripe.com/7sY14g1eP9cF2Ppee70VO07',stripePriceId:''},{id:'chip1712',chips:1712,priceLabel:'HK$198',priceHkd:198,stripeLinkTest:'https://buy.stripe.com/test_00wfZj3WQbv3dGpghD8og04',stripeLinkLive:'https://buy.stripe.com/eVqaEQbTt74x89J3zt0VO08',stripePriceId:''},{id:'chip2837',chips:2837,priceLabel:'HK$328',priceHkd:328,stripeLinkTest:'https://buy.stripe.com/test_6oUcN70KEaqZfOx4yV8og05',stripeLinkLive:'https://buy.stripe.com/9B628kaPpgF761B9XR0VO09',stripePriceId:''},{id:'chip3875',chips:3875,priceLabel:'HK$448',priceHkd:448,stripeLinkTest:'https://buy.stripe.com/test_14AeVf50U7eN45Pc1n8og06',stripeLinkLive:'https://buy.stripe.com/5kQ9AMg9JagJ1Ll1rl0VO0a',stripePriceId:''},{id:'chip5604',chips:5604,priceLabel:'HK$648',priceHkd:648,stripeLinkTest:'https://buy.stripe.com/test_28E7sN79242B8m5ghD8og07',stripeLinkLive:'https://buy.stripe.com/8x2eV65v52Oh0Hh3zt0VO0b',stripePriceId:''}];;const OVERLOAD_BANK_INFO={bankName:'HSBC Hong Kong',accountName:'MUX Text RPG',accountNumber:'124-888888-838',swift:'HSBCHKHHHKH'};const OVERLOAD_CHIP_SHOP_ITEMS=[{itemId:'weaponCrateDecoder',qty:1,chips:300,labelKey:'overloadShopDecoder'},{itemId:'renameCard',qty:1,chips:60,labelKey:'overloadShopRenameCard'}];let selectedRechargePkg=null;function getOverloadPkg(id){return OVERLOAD_CHIP_PACKAGES.find(p=>p.id===id);}function ensureOverloadOrders(){if(!player.overloadPaidOrders)player.overloadPaidOrders=[];if(player.overloadChips===undefined)player.overloadChips=0;}function grantOverloadChips(chips,orderId){ensureOverloadOrders();if(orderId&&player.overloadPaidOrders.includes(orderId)){logInfo(t('rechargeOrderExists'));return false;}if(orderId)player.overloadPaidOrders.push(orderId);player.overloadChips=(player.overloadChips||0)+chips;logInfo(t('overloadRechargeSuccess',chips));updateStatusBar();renderAllPanels();throttleSave();return true;}function stashOverloadPaymentReturn(){const params=new URLSearchParams(window.location.search);const success=params.get('overload_success');const sessionId=params.get('session_id')||params.get('checkout_session_id');if(!success)return;const pkg=getOverloadPkg(success);if(!pkg)return;if(!sessionId||!sessionId.startsWith('cs_')){if(isLivePayment()){logInfo(t('rechargeVerifyFail'));const cleanUrl=window.location.pathname+window.location.hash;window.history.replaceState({},'',cleanUrl);return;}}const orderId=sessionId||('url-'+success+'-'+Date.now());sessionStorage.setItem('td_pending_overload',JSON.stringify({chips:pkg.chips,orderId,packageId:success}));const cleanUrl=window.location.pathname+window.location.hash;window.history.replaceState({},'',cleanUrl);}async function applyPendingOverloadPayment(){const raw=sessionStorage.getItem('td_pending_overload');if(!raw)return;sessionStorage.removeItem('td_pending_overload');let data;try{data=JSON.parse(raw);}catch(e){return;}const orderId=data.orderId||'';const packageId=data.packageId||'';if(isLivePayment()){if(!PAYMENT_CONFIG.verifyEndpoint){if(PAYMENT_CONFIG.allowLiveTrustRedirect&&orderId.startsWith('cs_')){grantOverloadChips(data.chips,orderId);return;}logInfo(t('rechargeVerifyUnavailable'));return;}if(!orderId.startsWith('cs_')){logInfo(t('rechargeVerifyFail'));return;}try{const res=await fetch(PAYMENT_CONFIG.verifyEndpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:orderId,packageId})});const body=await res.json().catch(()=>({}));if(!res.ok||!body.paid){logInfo(t('rechargeVerifyFail'));return;}grantOverloadChips(body.chips,body.orderId);}catch(e){logInfo(t('rechargeVerifyFail'));}return;}grantOverloadChips(data.chips,orderId);}function openRechargeOverlay(pkgId){selectedRechargePkg=getOverloadPkg(pkgId);if(!selectedRechargePkg)return;const el=document.getElementById('recharge-selected-pkg');if(el)el.innerHTML='<div style="color:var(--chip);margin-bottom:.4rem;font-size:.55rem;">'+t('overloadBuyChips',selectedRechargePkg.chips,selectedRechargePkg.priceLabel)+(isLivePayment()?'<div style="font-size:0.45rem;color:#666;margin-top:0.2rem;">'+t('rechargeLiveBadge')+'</div>':'')+'</div>';document.getElementById('recharge-bank-info').style.display='none';document.getElementById('recharge-bank-ref').style.display='none';document.getElementById('btn-recharge-bank-submit').style.display='none';document.getElementById('recharge-overlay').style.display='flex';}function closeRechargeOverlay(){document.getElementById('recharge-overlay').style.display='none';selectedRechargePkg=null;}let stripeJsInstance=null,stripeJsLoadPromise=null;function ensureStripeJs(){if(window.Stripe)return Promise.resolve(window.Stripe);if(!stripeJsLoadPromise){stripeJsLoadPromise=new Promise((resolve,reject)=>{const s=document.createElement('script');s.src='https://js.stripe.com/v3/';s.async=true;s.onload=()=>resolve(window.Stripe);s.onerror=()=>reject(new Error('stripe_load'));document.head.appendChild(s);});}return stripeJsLoadPromise;}function getStripeJs(){const pk=getStripePublishableKey();if(!pk||!window.Stripe)return null;if(!stripeJsInstance||stripeJsInstance._pk!==pk){stripeJsInstance=window.Stripe(pk);stripeJsInstance._pk=pk;}return stripeJsInstance;}function getOverloadSuccessUrl(pkgId){const u=new URL(window.location.href.split('?')[0],window.location.origin);u.searchParams.set('overload_success',pkgId);u.searchParams.set('session_id','{CHECKOUT_SESSION_ID}');return u.toString();}async function startCardPayment(){if(!selectedRechargePkg)return;try{await ensureStripeJs();}catch(e){logInfo(t('rechargeCardPending'));return;}const pkg=selectedRechargePkg;const mount=document.getElementById('stripe-checkout-mount');if(mount)mount.innerHTML='';const link=getPkgStripeLink(pkg);if(link){logInfo(t('rechargeCardRedirect'));const sep=link.includes('?')?'&':'?';window.location.href=link+sep+'client_reference_id='+encodeURIComponent(pkg.id);closeRechargeOverlay();return;}if(isLivePayment()&&!PAYMENT_CONFIG.pkLive){logInfo(t('rechargeLiveNotConfigured'));return;}if(isLivePayment()){logInfo(t('rechargeLiveNotConfigured'));return;}const stripe=getStripeJs();if(!stripe){logInfo(t('rechargeCardPending'));return;}logInfo(t('rechargeCardPending'));}function showBankTransferInfo(){if(!selectedRechargePkg)return;const pkg=selectedRechargePkg;const orderId='OL-'+Date.now().toString(36).toUpperCase();selectedRechargePkg._orderId=orderId;const info=document.getElementById('recharge-bank-info');info.style.display='block';info.innerHTML='<div><b>'+t('rechargeBankTitle')+'</b></div><div>'+OVERLOAD_BANK_INFO.bankName+'</div><div>'+OVERLOAD_BANK_INFO.accountName+'</div><div>'+OVERLOAD_BANK_INFO.accountNumber+'</div><div>SWIFT: '+OVERLOAD_BANK_INFO.swift+'</div><div style="margin-top:.3rem;color:var(--chip);">'+t('rechargeBankRef')+' <b>'+orderId+'</b></div><div style="margin-top:.2rem;">'+t('overloadBuyChips',pkg.chips,pkg.priceLabel)+'</div>'+(isLivePayment()?'<div style="margin-top:0.3rem;color:#888;font-size:0.45rem;">'+t('rechargeBankLiveHint')+'</div>':'');document.getElementById('recharge-bank-ref').style.display='block';document.getElementById('btn-recharge-bank-submit').style.display='block';}function submitBankTransfer(){if(!selectedRechargePkg||!selectedRechargePkg._orderId)return;const ref=document.getElementById('recharge-bank-ref').value.trim();const orderId=selectedRechargePkg._orderId+(ref?'-'+ref:'');if(isLivePayment()){if(!player.overloadPendingBanks)player.overloadPendingBanks=[];player.overloadPendingBanks.push({orderId,packageId:selectedRechargePkg.id,chips:selectedRechargePkg.chips,ref,submittedAt:Date.now()});logInfo(t('rechargeBankPendingLive'));closeRechargeOverlay();throttleSave();return;}if(grantOverloadChips(selectedRechargePkg.chips,orderId)){logInfo(t('rechargeBankDone'));closeRechargeOverlay();renderArasakaShop();}}function showShopMenu(){currentShopView='menu';const menu=document.getElementById('shop-menu-panel');const equipPanel=document.getElementById('shop-equip-panel');const arasakaPanel=document.getElementById('shop-arasaka-panel');const chipsPanel=document.getElementById('shop-chips-panel');if(menu)menu.style.display='flex';if(equipPanel)equipPanel.style.display='none';if(arasakaPanel)arasakaPanel.style.display='none';if(chipsPanel)chipsPanel.style.display='none';}function switchShopTab(tab){currentShopView=tab;const menu=document.getElementById('shop-menu-panel');const equipPanel=document.getElementById('shop-equip-panel');const arasakaPanel=document.getElementById('shop-arasaka-panel');const chipsPanel=document.getElementById('shop-chips-panel');if(menu)menu.style.display='none';if(equipPanel)equipPanel.style.display=tab==='equip'?'block':'none';if(arasakaPanel)arasakaPanel.style.display=tab==='arasaka'?'block':'none';if(chipsPanel)chipsPanel.style.display=tab==='chips'?'block':'none';if(tab==='equip'){if(!player.shopItems||player.shopItems.length===0)refreshShop();else renderShop();}if(tab==='arasaka')renderArasakaShop();if(tab==='chips')renderOverloadChipShop();}function openShopSystem(){showShopMenu();shopOverlay.style.display='flex';}function getEquipPrice(eq){const base={common:80,rare:400,epic:2000,legendary:8000,hidden:50000};const mult=1+player.level*0.2;return Math.floor((base[eq.rarity]||100)*mult);}function refreshShop(){player.shopItems=[];for(let i=0;i<6;i++){const eq=generateShopEquipment(getShopEquipmentLevel());const price=getEquipPrice(eq);player.shopItems.push({eq,price,sold:false});}const now=new Date();const midnight=new Date(now.getFullYear(),now.getMonth(),now.getDate()+1,0,0,0);player.shopRefreshTime=midnight.getTime();renderShop();throttleSave();}function renderShop(){if(!player.shopItems||player.shopItems.length===0){refreshShop();return;}const now=Date.now();if(now>=player.shopRefreshTime){refreshShop();return;}shopItemsEl.innerHTML='';player.shopItems.forEach((item,i)=>{const{eq,price,sold}=item;const div=document.createElement('div');div.className='shop-item'+(sold?' sold':'');const info=document.createElement('div');info.className='shop-item-info';info.innerHTML=equipToString(eq,false);const priceSpan=document.createElement('span');priceSpan.className='shop-item-price';priceSpan.textContent=`${price}G`;const btn=document.createElement('button');btn.textContent=sold?t('shopSold'):t('shopBuy');btn.disabled=sold||player.gold<price;if(!sold){btn.addEventListener('click',()=>{if(player.gold<price){logInfo(t('shopNeedGold'));return;}if(isEquipInvFull()){notifyEquipBagFull();return;}player.gold-=price;player.equipInventory.push(eq);player.shopItems[i].sold=true;logInfo(t('shopBuySuccess',getEquipDisplayName(eq.name)));renderShop();renderAllPanels();updateStatusBar();throttleSave();});}div.appendChild(info);div.appendChild(priceSpan);div.appendChild(btn);shopItemsEl.appendChild(div);});const remaining=player.shopRefreshTime-Date.now();const hours=Math.floor(remaining/3600000);const minutes=Math.floor((remaining%3600000)/60000);shopInfoEl.innerHTML=`${t('shopRefresh')} | ${t('shopLv')} LV.${player.level} | ${t('shopNextRefresh',`${hours}h ${minutes}m`)}`;}document.getElementById('btn-shop').addEventListener('click',openShopSystem);document.getElementById('btn-craft').addEventListener('click',()=>{if(currentTab==='craft')switchToHomeView();else switchTab('craft');});document.getElementById('shop-tab-equip').addEventListener('click',()=>switchShopTab('equip'));document.getElementById('shop-tab-arasaka').addEventListener('click',()=>switchShopTab('arasaka'));document.getElementById('shop-tab-chips').addEventListener('click',()=>switchShopTab('chips'));document.getElementById('btn-shop-back-chips').addEventListener('click',showShopMenu);document.getElementById('btn-close-recharge').addEventListener('click',closeRechargeOverlay);document.getElementById('btn-pay-card').addEventListener('click',startCardPayment);document.getElementById('btn-pay-bank').addEventListener('click',showBankTransferInfo);document.getElementById('btn-recharge-bank-submit').addEventListener('click',submitBankTransfer);document.getElementById('btn-shop-back-equip').addEventListener('click',showShopMenu);document.getElementById('btn-shop-back-arasaka').addEventListener('click',showShopMenu);document.getElementById('btn-close-shop').addEventListener('click',()=>{shopOverlay.style.display='none';showShopMenu();});document.getElementById('btn-chat').addEventListener('click',handleChatTabClick);document.getElementById('chat-send').addEventListener('click',sendChatMessage);document.getElementById('chat-input').addEventListener('keydown',e=>{if(e.key==='Enter')sendChatMessage();});const chatInputEl=document.getElementById('chat-input');if(chatInputEl){chatInputEl.addEventListener('focus',()=>{scheduleChatMetrics();setTimeout(()=>{try{chatInputEl.scrollIntoView({block:'nearest',behavior:'smooth'});}catch(_){}},280);});}document.getElementById('btn-close-player-profile').addEventListener('click',closeChatPlayerProfile);document.getElementById('player-profile-overlay').addEventListener('click',e=>{if(e.target===document.getElementById('player-profile-overlay'))closeChatPlayerProfile();});shopOverlay.addEventListener('click',(e)=>{if(e.target===shopOverlay)shopOverlay.style.display='none';});const bossDefeatOverlay=document.getElementById('boss-defeat-overlay');function hideBossDefeatPopup(){bossDefeatOverlay.style.display='none';updateButtons();}function showBossDefeatPopup(bossName,gold,eq){document.getElementById('boss-defeat-title').textContent=t('msgBossDefeatTitle');document.getElementById('boss-defeat-msg').textContent=t('msgBossDefeatConfirm');const lootParts=[];if(gold>0)lootParts.push(`<div style="color:var(--gold);">+${gold} G</div>`);if(eq)lootParts.push(`<div style="color:#aaa;">${equipToString(eq,true)}</div>`);if(bossName)lootParts.push(`<div style="color:var(--boss);margin-top:0.3rem;">${bossName}</div>`);document.getElementById('boss-defeat-loot').innerHTML=lootParts.join('');bossLeaveAvailable=false;bossDefeatOverlay.style.display='flex';updateButtons();}document.getElementById('boss-defeat-leave').addEventListener('click',()=>{hideBossDefeatPopup();leaveDungeon(true);});document.getElementById('boss-defeat-continue').addEventListener('click',()=>{hideBossDefeatPopup();bossLeaveAvailable=true;logInfo(t('msgBossDefeated'));updateButtons();});const equipActionOverlay=document.getElementById('equip-action-overlay'),equipActionDetail=document.getElementById('equip-action-detail'),equipActionBtns=document.getElementById('equip-action-btns');const levelupOverlay=document.getElementById('levelup-overlay');function getLevelUpHealMessage(newLevel){return `玩家等級已提升至 Lv.${newLevel}，血量已自動回復`;}function notifyLevelUp(newLevel,showPopup=true){const msg=getLevelUpHealMessage(newLevel);logCombat(msg,'lvlup-msg');if(showPopup)showLevelUpPopup(newLevel,msg);publishLeaderboardEntry(true);}function showLevelUpPopup(newLevel,msg=getLevelUpHealMessage(newLevel)){document.getElementById('levelup-msg').innerHTML=`<div style="color:var(--xp);font-size:0.8rem;">${msg}</div><div style="color:var(--heal);margin-top:0.35rem;">HP 已回復至 ${player.hp}/${player.maxHp}</div><div style="color:var(--talent);margin-top:0.5rem;">獲得 1 點天賦點!</div><div style="color:#666;margin-top:0.3rem;">可在背包中使用天賦點提升屬性</div>`;levelupOverlay.style.display='flex';}document.getElementById('levelup-ok').addEventListener('click',()=>{levelupOverlay.style.display='none';});levelupOverlay.addEventListener('click',e=>{if(e.target===levelupOverlay)levelupOverlay.style.display='none';});
 
-let bugPipelineStatus=null,bugPipelineProbeTimer=null,bugLastReportAt=0,bugLastRejectionAt=0,bugLastRejectionMsg='',bugClientSignals=new Set();const LOCAL_KNOWN_BUG_FIXES={'level-rollback':'2.23.6','cloud-sync-fail':'2.17.1','xp-bar-stale':'2.6.6','leaderboard-stale':'2.8.6','runtime-tamper':'2.17.9','stat-inflation':'2.17.9','invalid-equipment':'2.17.9','equip-panel-broken':'2.23.1','version-update-stuck':'2.23.7','equip-bag-ghost':'2.23.3','fragment-recombine-count':'2.24.10','fragment-recombine-bag-space':'2.24.5','equip-bag-full-false':'2.24.8'};const AUTO_REPORT_IGNORE_SIGNALS=new Set(['stripe_verify_unconfigured','health_check']);function getBugCatalogFixVersion(bugId){const remote=(bugPipelineStatus&&bugPipelineStatus.knownBugs||[]).find(b=>b.id===bugId);if(remote&&remote.fixedVersion)return remote.fixedVersion;return LOCAL_KNOWN_BUG_FIXES[bugId]||null;}function isBugFixedForClient(issue){if(!issue||!issue.bugId)return false;const fix=issue.fixVersion||getBugCatalogFixVersion(issue.bugId);return !!(fix&&typeof compareGameVersion==='function'&&compareGameVersion(GAME_VERSION,fix)>=0);}function filterActiveBugIssues(list){return (list||[]).filter(it=>it.bugId&&it.bugId!=='unknown'&&!isBugFixedForClient(it));}function getAutoReportSignals(){return collectBugClientSignals().filter(s=>!AUTO_REPORT_IGNORE_SIGNALS.has(s));}function getBugPipelineEndpoint(){return(BUG_PIPELINE_CONFIG.endpoint||'').replace(/\/$/,'');}function collectBugClientSignals(){const signals=new Set(bugClientSignals);if(typeof player!=='undefined'&&player){const peak=Math.floor(Number(player.stats&&player.stats.peakLevel)||0),lv=Math.floor(Number(player.level)||1);if(peak>lv)signals.add('peak_level_mismatch');if(typeof getTalentBudgetUsed==='function'&&getTalentBudgetUsed()>getTalentBudgetMax()+2)signals.add('talent_overflow');if(typeof _acSeal!=='undefined'&&_acSeal&&typeof computePlayerSeal==='function'&&computePlayerSeal(player)!==_acSeal)signals.add('runtime_tamper');const cloudSt=document.getElementById('cloud-sync-status');if(cloudSt&&cloudSt.classList.contains('offline'))signals.add('cloud_sync_offline');const chatSt=document.getElementById('chat-status');if(chatSt&&(chatSt.classList.contains('offline')||chatSt.textContent==='offline'))signals.add('chat_offline');if(typeof inCombat!=='undefined'&&inCombat&&typeof attackQueue!=='undefined'&&attackQueue.length>0&&typeof isProcessingQueue!=='undefined'&&!isProcessingQueue)signals.add('combat_queue_stuck');if(typeof inDungeon!=='undefined'&&inDungeon&&typeof currentDungeon!=='undefined'&&!currentDungeon)signals.add('dungeon_state_invalid');}try{if(typeof hasActiveCloudSession==='function'&&hasActiveCloudSession()){if(typeof gunPeerConnected!=='undefined'&&!gunPeerConnected)signals.add('gun_relay_blocked');if(typeof accountNeedsCloudPush==='function'&&accountNeedsCloudPush()&&gunPeerConnected)signals.add('cloud_upload_fail');if(typeof requiresPaymentVerification==='function'&&requiresPaymentVerification()&&!PAYMENT_CONFIG.verifyEndpoint)signals.add('stripe_verify_unconfigured');}}catch(e){}return[...signals];}function buildBugReportPayload(extra={}){const vp=typeof getLayoutViewport==='function'?getLayoutViewport():{};return{gameVersion:GAME_VERSION,saveVersion:SAVE_VERSION,message:String(extra.message||'').slice(0,500),stack:String(extra.stack||'').slice(0,1000),signals:collectBugClientSignals(),context:{lang:currentLang,inDungeon:!!inDungeon,inCombat:!!inCombat,hasAccount:!!(typeof getSessionKey==='function'&&getSessionKey()),online:typeof navigator==='undefined'||navigator.onLine!==false,viewport:vp},source:extra.source||'client'};}async function fetchBugPipelineStatus(){const base=getBugPipelineEndpoint();if(!base)return null;try{const r=await fetch(base+'/status',{cache:'no-store'});if(!r.ok)return null;return await r.json();}catch(e){return null;}}async function submitBugReport(payload){const base=getBugPipelineEndpoint();if(!base)return{ok:false};const now=Date.now();if(!payload.force&&now-bugLastReportAt<BUG_PIPELINE_CONFIG.reportCooldownMs)return{ok:false,reason:'cooldown'};try{const r=await fetch(base+'/report',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});bugLastReportAt=now;if(!r.ok)return{ok:false};return await r.json();}catch(e){return{ok:false};}}function updateBugPipelineUI(){const stEl=document.getElementById('bug-pipeline-status');if(!stEl)return;if(!getBugPipelineEndpoint()){stEl.textContent=t('bugPipelineDisabled');stEl.className='setting-val';return;}const activeIssues=filterActiveBugIssues(bugPipelineStatus&&bugPipelineStatus.activeIssues);if(!activeIssues.length){stEl.textContent=t('bugPipelineOk');stEl.className='setting-val bug-pipeline-ok';return;}const top=activeIssues[0];const sum=(top.summary&&top.summary[currentLang])||(top.summary&&top.summary.zh)||top.bugId||'';stEl.textContent=sum;stEl.className='setting-val bug-pipeline-warn';}async function refreshBugPipeline(){const data=await fetchBugPipelineStatus();if(data)bugPipelineStatus=data;updateBugPipelineUI();const signals=getAutoReportSignals();if(signals.length)await submitBugReport(buildBugReportPayload({message:'auto-detect: '+signals.join(','),source:'auto-probe'}));}function scheduleBugPipelineProbe(){if(bugPipelineProbeTimer)clearInterval(bugPipelineProbeTimer);if(!getBugPipelineEndpoint()){updateBugPipelineUI();return;}const runProbe=()=>refreshBugPipeline();if(typeof requestIdleCallback==='function')requestIdleCallback(()=>setTimeout(runProbe,1200),{timeout:4000});else setTimeout(runProbe,2500);bugPipelineProbeTimer=setInterval(refreshBugPipeline,BUG_PIPELINE_CONFIG.pollIntervalMs);}function setupBugPipelineErrorHooks(){window.addEventListener('error',e=>{bugClientSignals.add('js_error');submitBugReport(buildBugReportPayload({message:e.message||'error',stack:(e.error&&e.error.stack||'').slice(0,800),source:'onerror'}));});window.addEventListener('unhandledrejection',e=>{const reason=e.reason;const msg=String(reason&&reason.message||reason||'');const stack=String(reason&&reason.stack||'');const now=Date.now();if(msg&&msg===bugLastRejectionMsg&&now-bugLastRejectionAt<300000)return;bugLastRejectionMsg=msg;bugLastRejectionAt=now;if(typeof e.preventDefault==='function')e.preventDefault();if(/putCloudAccount|fetchCloudAccount|uploadCloudAccount|forceCloudSync|tickCloudIdle/i.test(stack+msg))bugClientSignals.add('cloud_upload_fail');if(typeof hasActiveCloudSession==='function'&&hasActiveCloudSession()&&!gunPeerConnected)bugClientSignals.add('gun_relay_blocked');bugClientSignals.add('unhandled_rejection');submitBugReport(buildBugReportPayload({message:msg,stack:stack.slice(0,800),source:'unhandledrejection'}));});}function renderBugLifecycleOverlay(){const list=document.getElementById('bug-lifecycle-list');if(!list)return;const issues=filterActiveBugIssues(bugPipelineStatus&&bugPipelineStatus.activeIssues);const stages=(bugPipelineStatus&&bugPipelineStatus.stages)||[];let html='<p class="bug-lifecycle-intro">'+t('bugLifecycleIntro')+'</p>';if(!getBugPipelineEndpoint()){html+='<p>'+t('bugPipelineDisabled')+'</p>';}else if(!issues.length){html+='<p class="bug-pipeline-ok">'+t('bugPipelineOk')+'</p>';}else{html+='<ul class="bug-lifecycle-items">';issues.forEach(it=>{const sum=(it.summary&&it.summary[currentLang])||(it.summary&&it.summary.zh)||it.bugId;const fix=it.fixVersion?' → v'+it.fixVersion:'';html+='<li><b>'+it.stage+'</b> · '+sum+fix+' <span class="bug-sev-'+it.severity+'">'+it.severity+'</span></li>';});html+='</ul>';}if(stages.length)html+='<p class="bug-lifecycle-stages">'+t('bugLifecycleStages')+': '+stages.join(' → ')+'</p>';list.innerHTML=html;}function openBugLifecycleOverlay(){renderBugLifecycleOverlay();const ol=document.getElementById('bug-lifecycle-overlay');if(ol)ol.style.display='flex';}function closeBugLifecycleOverlay(){const ol=document.getElementById('bug-lifecycle-overlay');if(ol)ol.style.display='none';}function promptBugReport(){const base=getBugPipelineEndpoint();if(!base){showAlert(t('bugPipelineDisabled'));return;}showConfirm(t('bugReportPrompt'),()=>{const extra=window.prompt(currentLang==='zh'?'補充說明（可留空）':'Details (optional)','')||'';submitBugReport(buildBugReportPayload({message:extra||'player-report',source:'manual',force:true})).then(res=>{if(res&&res.ok){const hint=res.fixVersion&&res.fixVersion!==GAME_VERSION?t('bugPipelineFixHint',res.fixVersion):t('bugReportThanks');showAlert(hint);logInfo(t('bugReportLogged'));refreshBugPipeline();}else showAlert(t('bugReportFail'));});});}function setupBugPipelineUI(){setupBugPipelineErrorHooks();scheduleBugPipelineProbe();const btnLife=document.getElementById('btn-bug-lifecycle');if(btnLife)btnLife.addEventListener('click',openBugLifecycleOverlay);const btnClose=document.getElementById('btn-close-bug-lifecycle');if(btnClose)btnClose.addEventListener('click',closeBugLifecycleOverlay);const ol=document.getElementById('bug-lifecycle-overlay');if(ol)ol.addEventListener('click',e=>{if(e.target===ol)closeBugLifecycleOverlay();});const btnReport=document.getElementById('btn-bug-report');if(btnReport)btnReport.addEventListener('click',promptBugReport);}function restartGame(){invalidateMapCells();clearAllTimers();clearDroneTimers();clearAccountSave();player=getDefaultPlayer();currentDungeon=null;mapData=[];playerPos={r:3,c:3};monstersRemaining=0;bossDefeated=false;bossLeaveAvailable=false;currentEnemy=null;inCombat=false;gameOver=false;inDungeon=false;attackQueue=[];isProcessingQueue=false;playerAttackCooldownUntil=0;player.isPermanentlyDead=false;player.memoryDecay=0;lockedEquipment=new Set();equipmentFilter={type:'all',rarity:'all',affix:'all'};document.getElementById('recycle-overlay').style.display='none';document.getElementById('filter-overlay').style.display='none';logEl.innerHTML='';battleScreen.classList.remove('active');document.getElementById('map-container').style.display='none';quickBtns.classList.remove('hidden');enableAllPanels();permanentDeathOverlay.style.display='none';renderAllPanels();updateStatusBar();updateButtons();switchToHomeView();logInfo('-- 新遊戲 --');logInfo(tl('按地城開始冒險','Tap Dungeon to start exploring'));startPlaytimeCounter();}function updateHomeViewState(){const main=document.getElementById('game-main');if(!main)return;const panelOpen=['equip','inventory','craft','profile','chat','pet'].includes(currentTab);const combatActive=main.classList.contains('combat-layout');const logOpen=currentTab==='log'&&inDungeon&&(isDesktopLayout()||combatActive);main.classList.toggle('home-view',!panelOpen&&!logOpen&&!combatActive);}function switchToHomeView(){switchTab('home');}function onTabBtnClick(tab){if(tab==='pet'&&currentTab==='pet'){switchToHomeView();return;}if((tab==='equip'||tab==='inventory'||tab==='profile'||tab==='chat')&&currentTab===tab){switchToHomeView();return;}switchTab(tab);}function switchTab(tab,skipCloseChat){if(tab==='log'&&!inDungeon)tab='home';if(tab!=='equip'&&bulkRecyclePickMode)exitBulkRecyclePickMode();if(tab==='home'){currentTab='';document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));const logSidebarTitleEl=document.getElementById('log-sidebar-title');if(logSidebarTitleEl)logSidebarTitleEl.classList.remove('log-tab-active');equipPanel.classList.remove('show');inventoryPanel.classList.remove('show');craftPanel.classList.remove('show');profilePanel.classList.remove('show');const embedded=document.getElementById('chat-embedded');if(embedded){embedded.classList.remove('show');embedded.style.display='none';}setLogVisible(false);updateCombatLayout();updatePanelSidebarTitle();updateChatLayout();updatePlayerXpStripVisibility();updateHomeViewState();return;}currentTab=tab;document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));const logSidebarTitleEl=document.getElementById('log-sidebar-title');if(logSidebarTitleEl)logSidebarTitleEl.classList.toggle('log-tab-active',tab==='log');const tabBtn=document.querySelector(`[data-tab="${tab}"]`);const chatBtn=document.getElementById('btn-chat');if(tab==='chat'){if(chatBtn)chatBtn.classList.add('active');}else if(tabBtn)tabBtn.classList.add('active');equipPanel.classList.remove('show');inventoryPanel.classList.remove('show');craftPanel.classList.remove('show');profilePanel.classList.remove('show');const embedded=document.getElementById('chat-embedded');if(embedded){embedded.classList.remove('show');if(tab!=='chat')embedded.style.display='none';}setLogVisible(tab==='log'||(inDungeon&&!inCombat&&!isDesktopLayout()&&!['equip','inventory','craft','profile','chat','pet'].includes(tab)));updateCombatLayout();if(tab==='equip'){equipPanel.classList.add('show');renderEquipPanel();}else if(tab==='inventory'){inventoryPanel.classList.add('show');renderInventoryPanel();}else if(tab==='craft'){craftPanel.classList.add('show');renderCraftPanel();}else if(tab==='profile'){profilePanel.classList.add('show');renderProfilePanel();}else if(tab==='pet'){const petP=document.getElementById('pet-panel');if(petP){petP.classList.add('show');renderPetPanel();}}else if(tab==='chat'){setLogVisible(false);if(embedded){embedded.classList.add('show');embedded.style.display='flex';}ensureChatLazyInit();initChat();}updatePanelSidebarTitle();updateChatLayout();updatePlayerXpStripVisibility();updateLogOverlayBounds();updateHomeViewState();}function initGame(){stashOverloadPaymentReturn();loadPlayerName();let hasSave=loadGame();if(!hasSave&&getSessionKey()&&restoreBestAccountSaveFromHistory())hasSave=loadGame();if(!hasSave){player=getDefaultPlayer();recalcPlayerStats();const acc=getActiveAccount();const savedName=acc?(acc.displayName||acc.username):localStorage.getItem('td_player_name');const continueInit=()=>{logEl.innerHTML='';battleScreen.classList.remove('active');document.getElementById('map-container').style.display='none';logInfo('-- 文字地城 --');logInfo(tl('按地城開始冒險','Tap Dungeon to start exploring'));player.hp=clamp(player.hp,0,player.maxHp);renderAllPanels();if(!isDevAccount())updateStatusBar();updateButtons();updateDungeonLogUi();switchToHomeView();if(!player.shopItems||player.shopItems.length===0||Date.now()>=player.shopRefreshTime){refreshShop();}startPlaytimeCounter();sealPlayerState();startAntiCheatWatchdog();ensureChatLazyInit();initVersionWatch();applyPendingOverloadPayment().catch(()=>{});};if(!savedName||savedName.trim()===''||savedName.trim()==='PLAYER'){promptNewPlayerName((name)=>{savePlayerName(name);continueInit();});}else{playerCustomName=savedName.trim()||'PLAYER';document.getElementById('player-name-custom').textContent=playerCustomName;continueInit();}return;}else{if(player.isPermanentlyDead){logEl.innerHTML='';logInfo(tl('此角色已永久死亡！','This character is permanently dead!'));showPermanentDeath();return;}loadPlayerName();if(gameOver||!inDungeon){battleScreen.classList.remove('active');document.getElementById('map-container').style.display='none';if(gameOver)logInfo(tl('遊戲結束 - 按重新開始','Game Over — tap Restart'));else logInfo(tl('存檔已載入','Save loaded'));}else{battleScreen.classList.remove('active');document.getElementById('map-container').style.display='flex';renderMap();ensureDungeonMoveAnchor();logInfo(tl('存檔已載入','Save loaded'));}}player.hp=clamp(player.hp,0,player.maxHp);renderAllPanels();updateStatusBar();updateButtons();updateDungeonLogUi();if(!inDungeon)switchToHomeView();else updateHomeViewState();if(!player.shopItems||player.shopItems.length===0||Date.now()>=player.shopRefreshTime){refreshShop();}startPlaytimeCounter();sealPlayerState();startAntiCheatWatchdog();ensureChatLazyInit();initVersionWatch();applyPendingOverloadPayment().catch(()=>{});}btnAtkMain.addEventListener('click',()=>queueAttack(true));btnAtkOff.addEventListener('click',()=>queueAttack(false));btnRestart.addEventListener('click',restartGame);document.querySelectorAll('.tab-btn[data-tab]').forEach(b=>b.addEventListener('click',()=>onTabBtnClick(b.dataset.tab)));const logSidebarTitleClick=document.getElementById('log-sidebar-title');if(logSidebarTitleClick&&!logSidebarTitleClick.__bound){logSidebarTitleClick.__bound=true;logSidebarTitleClick.addEventListener('click',()=>switchTab('log'));}document.getElementById('btn-dungeon').addEventListener('click',()=>{if(player.isPermanentlyDead){logInfo(tl('角色已永久死亡','Character permanently dead'));return;}if(inDungeon){logInfo(tl('已在地城中','Already inside a dungeon'));return;}renderDungeonAdventure();dungeonOverlay.style.display='flex';});const dungeonLoadMoreBtn=document.getElementById('dungeon-load-more');if(dungeonLoadMoreBtn&&!dungeonLoadMoreBtn.__bound){dungeonLoadMoreBtn.__bound=true;dungeonLoadMoreBtn.addEventListener('click',()=>{dungeonLoadMoreExtra++;renderDungeonAdventure(false);});}document.getElementById('btn-close-dungeon').addEventListener('click',()=>{dungeonOverlay.style.display='none';});dungeonOverlay.addEventListener('click',e=>{if(e.target===dungeonOverlay)dungeonOverlay.style.display='none';});document.getElementById('btn-close-difficulty').addEventListener('click',()=>{difficultyOverlay.style.display='none';});difficultyOverlay.addEventListener('click',e=>{if(e.target===difficultyOverlay)difficultyOverlay.style.display='none';});document.getElementById('talent-close').addEventListener('click',()=>{document.getElementById('talent-overlay').style.display='none';});function runBootSequence(){consumeVersionReloadParam();const overlay=document.getElementById('loading-overlay');const textEl=document.getElementById('loading-text');const barFill=document.getElementById('loading-bar-fill');if(textEl)textEl.textContent=t('loadingText');if(overlay)overlay.style.display='flex';if(barFill){barFill.style.animation='none';void barFill.offsetWidth;barFill.style.animation='';barFill.style.animationDuration='1.1s';}startServerWarmup();const finishBoot=()=>{if(overlay)overlay.classList.add('fade-out');setTimeout(()=>{if(overlay){overlay.style.display='none';overlay.classList.remove('fade-out');}continueGameBoot();},320);};setTimeout(finishBoot,900);}initCombatItemBar();setupAccountUI();setupVersionUI();setupLeaderboardUI();setupFloatHubUI();setupBugPipelineUI();runBootSequence();})();</script>
+let bugPipelineStatus=null,bugPipelineProbeTimer=null,bugLastReportAt=0,bugLastRejectionAt=0,bugLastRejectionMsg='',bugClientSignals=new Set();const LOCAL_KNOWN_BUG_FIXES={'level-rollback':'2.23.6','cloud-sync-fail':'2.17.1','xp-bar-stale':'2.6.6','leaderboard-stale':'2.8.6','runtime-tamper':'2.17.9','stat-inflation':'2.17.9','invalid-equipment':'2.17.9','equip-panel-broken':'2.23.1','version-update-stuck':'2.23.7','equip-bag-ghost':'2.23.3','fragment-recombine-count':'2.24.10','fragment-recombine-bag-space':'2.24.5','equip-bag-full-false':'2.24.8'};const AUTO_REPORT_IGNORE_SIGNALS=new Set(['stripe_verify_unconfigured','health_check']);function getBugCatalogFixVersion(bugId){const remote=(bugPipelineStatus&&bugPipelineStatus.knownBugs||[]).find(b=>b.id===bugId);if(remote&&remote.fixedVersion)return remote.fixedVersion;return LOCAL_KNOWN_BUG_FIXES[bugId]||null;}function isBugFixedForClient(issue){if(!issue||!issue.bugId)return false;const fix=issue.fixVersion||getBugCatalogFixVersion(issue.bugId);return !!(fix&&typeof compareGameVersion==='function'&&compareGameVersion(GAME_VERSION,fix)>=0);}function filterActiveBugIssues(list){return (list||[]).filter(it=>it.bugId&&it.bugId!=='unknown'&&!isBugFixedForClient(it));}function getAutoReportSignals(){return collectBugClientSignals().filter(s=>!AUTO_REPORT_IGNORE_SIGNALS.has(s));}function getBugPipelineEndpoint(){return(BUG_PIPELINE_CONFIG.endpoint||'').replace(/\/$/,'');}function collectBugClientSignals(){const signals=new Set(bugClientSignals);if(typeof player!=='undefined'&&player){const peak=Math.floor(Number(player.stats&&player.stats.peakLevel)||0),lv=Math.floor(Number(player.level)||1);if(peak>lv)signals.add('peak_level_mismatch');if(typeof getTalentBudgetUsed==='function'&&getTalentBudgetUsed()>getTalentBudgetMax()+2)signals.add('talent_overflow');if(typeof _acSeal!=='undefined'&&_acSeal&&typeof computePlayerSeal==='function'&&computePlayerSeal(player)!==_acSeal)signals.add('runtime_tamper');const cloudSt=document.getElementById('cloud-sync-status');if(cloudSt&&cloudSt.classList.contains('offline'))signals.add('cloud_sync_offline');const chatSt=document.getElementById('chat-status');if(chatSt&&(chatSt.classList.contains('offline')||chatSt.textContent==='offline'))signals.add('chat_offline');if(typeof inCombat!=='undefined'&&inCombat&&typeof attackQueue!=='undefined'&&attackQueue.length>0&&typeof isProcessingQueue!=='undefined'&&!isProcessingQueue)signals.add('combat_queue_stuck');if(typeof inDungeon!=='undefined'&&inDungeon&&typeof currentDungeon!=='undefined'&&!currentDungeon)signals.add('dungeon_state_invalid');}try{if(typeof hasActiveCloudSession==='function'&&hasActiveCloudSession()){if(typeof gunPeerConnected!=='undefined'&&!gunPeerConnected)signals.add('gun_relay_blocked');if(typeof accountNeedsCloudPush==='function'&&accountNeedsCloudPush()&&gunPeerConnected)signals.add('cloud_upload_fail');if(typeof requiresPaymentVerification==='function'&&requiresPaymentVerification()&&!PAYMENT_CONFIG.verifyEndpoint)signals.add('stripe_verify_unconfigured');}}catch(e){}return[...signals];}function buildBugReportPayload(extra={}){const vp=typeof getLayoutViewport==='function'?getLayoutViewport():{};return{gameVersion:GAME_VERSION,saveVersion:SAVE_VERSION,message:String(extra.message||'').slice(0,500),stack:String(extra.stack||'').slice(0,1000),signals:collectBugClientSignals(),context:{lang:currentLang,inDungeon:!!inDungeon,inCombat:!!inCombat,hasAccount:!!(typeof getSessionKey==='function'&&getSessionKey()),online:typeof navigator==='undefined'||navigator.onLine!==false,viewport:vp},source:extra.source||'client'};}async function fetchBugPipelineStatus(){const base=getBugPipelineEndpoint();if(!base)return null;try{const r=await fetch(base+'/status',{cache:'no-store'});if(!r.ok)return null;return await r.json();}catch(e){return null;}}async function submitBugReport(payload){const base=getBugPipelineEndpoint();if(!base)return{ok:false};const now=Date.now();if(!payload.force&&now-bugLastReportAt<BUG_PIPELINE_CONFIG.reportCooldownMs)return{ok:false,reason:'cooldown'};try{const r=await fetch(base+'/report',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});bugLastReportAt=now;if(!r.ok)return{ok:false};return await r.json();}catch(e){return{ok:false};}}function updateBugPipelineUI(){const stEl=document.getElementById('bug-pipeline-status');if(!stEl)return;if(!getBugPipelineEndpoint()){stEl.textContent=t('bugPipelineDisabled');stEl.className='setting-val';return;}const activeIssues=filterActiveBugIssues(bugPipelineStatus&&bugPipelineStatus.activeIssues);if(!activeIssues.length){stEl.textContent=t('bugPipelineOk');stEl.className='setting-val bug-pipeline-ok';return;}const top=activeIssues[0];const sum=(top.summary&&top.summary[currentLang])||(top.summary&&top.summary.zh)||top.bugId||'';stEl.textContent=sum;stEl.className='setting-val bug-pipeline-warn';}async function refreshBugPipeline(){const data=await fetchBugPipelineStatus();if(data)bugPipelineStatus=data;updateBugPipelineUI();const signals=getAutoReportSignals();if(signals.length)await submitBugReport(buildBugReportPayload({message:'auto-detect: '+signals.join(','),source:'auto-probe'}));}function scheduleBugPipelineProbe(){if(bugPipelineProbeTimer)clearInterval(bugPipelineProbeTimer);if(!getBugPipelineEndpoint()){updateBugPipelineUI();return;}const runProbe=()=>refreshBugPipeline();if(typeof requestIdleCallback==='function')requestIdleCallback(()=>setTimeout(runProbe,1200),{timeout:4000});else setTimeout(runProbe,2500);bugPipelineProbeTimer=setInterval(refreshBugPipeline,BUG_PIPELINE_CONFIG.pollIntervalMs);}function setupBugPipelineErrorHooks(){window.addEventListener('error',e=>{bugClientSignals.add('js_error');submitBugReport(buildBugReportPayload({message:e.message||'error',stack:(e.error&&e.error.stack||'').slice(0,800),source:'onerror'}));});window.addEventListener('unhandledrejection',e=>{const reason=e.reason;const msg=String(reason&&reason.message||reason||'');const stack=String(reason&&reason.stack||'');const now=Date.now();if(msg&&msg===bugLastRejectionMsg&&now-bugLastRejectionAt<300000)return;bugLastRejectionMsg=msg;bugLastRejectionAt=now;if(typeof e.preventDefault==='function')e.preventDefault();if(/putCloudAccount|fetchCloudAccount|uploadCloudAccount|forceCloudSync|tickCloudIdle/i.test(stack+msg))bugClientSignals.add('cloud_upload_fail');if(typeof hasActiveCloudSession==='function'&&hasActiveCloudSession()&&!gunPeerConnected)bugClientSignals.add('gun_relay_blocked');bugClientSignals.add('unhandled_rejection');submitBugReport(buildBugReportPayload({message:msg,stack:stack.slice(0,800),source:'unhandledrejection'}));});}function renderBugLifecycleOverlay(){const list=document.getElementById('bug-lifecycle-list');if(!list)return;const issues=filterActiveBugIssues(bugPipelineStatus&&bugPipelineStatus.activeIssues);const stages=(bugPipelineStatus&&bugPipelineStatus.stages)||[];let html='<p class="bug-lifecycle-intro">'+t('bugLifecycleIntro')+'</p>';if(!getBugPipelineEndpoint()){html+='<p>'+t('bugPipelineDisabled')+'</p>';}else if(!issues.length){html+='<p class="bug-pipeline-ok">'+t('bugPipelineOk')+'</p>';}else{html+='<ul class="bug-lifecycle-items">';issues.forEach(it=>{const sum=(it.summary&&it.summary[currentLang])||(it.summary&&it.summary.zh)||it.bugId;const fix=it.fixVersion?' → v'+it.fixVersion:'';html+='<li><b>'+it.stage+'</b> · '+sum+fix+' <span class="bug-sev-'+it.severity+'">'+it.severity+'</span></li>';});html+='</ul>';}if(stages.length)html+='<p class="bug-lifecycle-stages">'+t('bugLifecycleStages')+': '+stages.join(' → ')+'</p>';list.innerHTML=html;}function openBugLifecycleOverlay(){renderBugLifecycleOverlay();const ol=document.getElementById('bug-lifecycle-overlay');if(ol)ol.style.display='flex';}function closeBugLifecycleOverlay(){const ol=document.getElementById('bug-lifecycle-overlay');if(ol)ol.style.display='none';}function promptBugReport(){const base=getBugPipelineEndpoint();if(!base){showAlert(t('bugPipelineDisabled'));return;}showConfirm(t('bugReportPrompt'),()=>{const extra=window.prompt(currentLang==='zh'?'補充說明（可留空）':'Details (optional)','')||'';submitBugReport(buildBugReportPayload({message:extra||'player-report',source:'manual',force:true})).then(res=>{if(res&&res.ok){const hint=res.fixVersion&&res.fixVersion!==GAME_VERSION?t('bugPipelineFixHint',res.fixVersion):t('bugReportThanks');showAlert(hint);logInfo(t('bugReportLogged'));refreshBugPipeline();}else showAlert(t('bugReportFail'));});});}function setupBugPipelineUI(){setupBugPipelineErrorHooks();scheduleBugPipelineProbe();const btnLife=document.getElementById('btn-bug-lifecycle');if(btnLife)btnLife.addEventListener('click',openBugLifecycleOverlay);const btnClose=document.getElementById('btn-close-bug-lifecycle');if(btnClose)btnClose.addEventListener('click',closeBugLifecycleOverlay);const ol=document.getElementById('bug-lifecycle-overlay');if(ol)ol.addEventListener('click',e=>{if(e.target===ol)closeBugLifecycleOverlay();});const btnReport=document.getElementById('btn-bug-report');if(btnReport)btnReport.addEventListener('click',promptBugReport);}function restartGame(){invalidateMapCells();clearAllTimers();clearDroneTimers();clearAccountSave();player=getDefaultPlayer();currentDungeon=null;mapData=[];playerPos={r:3,c:3};monstersRemaining=0;bossDefeated=false;bossLeaveAvailable=false;currentEnemy=null;inCombat=false;gameOver=false;inDungeon=false;attackQueue=[];isProcessingQueue=false;playerAttackCooldownUntil=0;player.isPermanentlyDead=false;player.memoryDecay=0;lockedEquipment=new Set();equipmentFilter={type:'all',rarity:'all',affix:'all'};document.getElementById('recycle-overlay').style.display='none';document.getElementById('filter-overlay').style.display='none';logEl.innerHTML='';battleScreen.classList.remove('active');document.getElementById('map-container').style.display='none';quickBtns.classList.remove('hidden');enableAllPanels();permanentDeathOverlay.style.display='none';renderAllPanels();updateStatusBar();updateButtons();switchToHomeView();logInfo('-- 新遊戲 --');logInfo(tl('按地城開始冒險','Tap Dungeon to start exploring'));startPlaytimeCounter();}function updateHomeViewState(){const main=document.getElementById('game-main');if(!main)return;const panelOpen=['equip','inventory','craft','profile','chat','pet'].includes(currentTab);const combatActive=main.classList.contains('combat-layout');const logOpen=currentTab==='log'&&inDungeon&&(isDesktopLayout()||combatActive);main.classList.toggle('home-view',!panelOpen&&!logOpen&&!combatActive);}function switchToHomeView(){switchTab('home');}function onTabBtnClick(tab){if(tab==='pet'&&currentTab==='pet'){switchToHomeView();return;}if((tab==='equip'||tab==='inventory'||tab==='profile'||tab==='chat')&&currentTab===tab){switchToHomeView();return;}switchTab(tab);}function switchTab(tab,skipCloseChat){if(tab==='log'&&!inDungeon)tab='home';if(tab!=='equip'&&bulkRecyclePickMode)exitBulkRecyclePickMode();if(tab==='home'){currentTab='';document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));const logSidebarTitleEl=document.getElementById('log-sidebar-title');if(logSidebarTitleEl)logSidebarTitleEl.classList.remove('log-tab-active');equipPanel.classList.remove('show');inventoryPanel.classList.remove('show');craftPanel.classList.remove('show');profilePanel.classList.remove('show');const embedded=document.getElementById('chat-embedded');if(embedded){embedded.classList.remove('show');embedded.style.display='none';}setLogVisible(false);updateCombatLayout();updatePanelSidebarTitle();updateChatLayout();updatePlayerXpStripVisibility();updateHomeViewState();return;}currentTab=tab;document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));const logSidebarTitleEl=document.getElementById('log-sidebar-title');if(logSidebarTitleEl)logSidebarTitleEl.classList.toggle('log-tab-active',tab==='log');const tabBtn=document.querySelector(`[data-tab="${tab}"]`);const chatBtn=document.getElementById('btn-chat');if(tab==='chat'){if(chatBtn)chatBtn.classList.add('active');}else if(tabBtn)tabBtn.classList.add('active');equipPanel.classList.remove('show');inventoryPanel.classList.remove('show');craftPanel.classList.remove('show');profilePanel.classList.remove('show');const embedded=document.getElementById('chat-embedded');if(embedded){embedded.classList.remove('show');if(tab!=='chat')embedded.style.display='none';}setLogVisible(tab==='log'||(inDungeon&&!inCombat&&!isDesktopLayout()&&!['equip','inventory','craft','profile','chat','pet'].includes(tab)));updateCombatLayout();if(tab==='equip'){equipPanel.classList.add('show');renderEquipPanel();}else if(tab==='inventory'){inventoryPanel.classList.add('show');renderInventoryPanel();}else if(tab==='craft'){craftPanel.classList.add('show');renderCraftPanel();}else if(tab==='profile'){profilePanel.classList.add('show');renderProfilePanel();}else if(tab==='pet'){const petP=document.getElementById('pet-panel');if(petP){petP.classList.add('show');renderPetPanel();}}else if(tab==='chat'){setLogVisible(false);if(embedded){embedded.classList.add('show');embedded.style.display='flex';}ensureChatLazyInit();initChat();}updatePanelSidebarTitle();updateChatLayout();updatePlayerXpStripVisibility();updateLogOverlayBounds();updateHomeViewState();}function initGame(){stashOverloadPaymentReturn();loadPlayerName();let hasSave=loadGame();if(!hasSave&&getSessionKey()&&restoreBestAccountSaveFromHistory())hasSave=loadGame();if(!hasSave){player=getDefaultPlayer();recalcPlayerStats();const acc=getActiveAccount();const savedName=acc?(acc.displayName||acc.username):localStorage.getItem('td_player_name');const continueInit=()=>{logEl.innerHTML='';battleScreen.classList.remove('active');document.getElementById('map-container').style.display='none';logInfo('-- 文字地城 --');logInfo(tl('按地城開始冒險','Tap Dungeon to start exploring'));player.hp=clamp(player.hp,0,player.maxHp);renderAllPanels();if(!isDevAccount())updateStatusBar();updateButtons();updateDungeonLogUi();switchToHomeView();if(!player.shopItems||player.shopItems.length===0||Date.now()>=player.shopRefreshTime){refreshShop();}startPlaytimeCounter();sealPlayerState();startAntiCheatWatchdog();ensureChatLazyInit();initVersionWatch();applyPendingOverloadPayment().catch(()=>{});};if(!savedName||savedName.trim()===''||savedName.trim()==='PLAYER'){promptNewPlayerName((name)=>{savePlayerName(name);continueInit();});}else{playerCustomName=savedName.trim()||'PLAYER';document.getElementById('player-name-custom').textContent=playerCustomName;continueInit();}return;}else{if(player.isPermanentlyDead){logEl.innerHTML='';logInfo(tl('此角色已永久死亡！','This character is permanently dead!'));showPermanentDeath();return;}loadPlayerName();if(gameOver||!inDungeon){battleScreen.classList.remove('active');document.getElementById('map-container').style.display='none';if(gameOver)logInfo(tl('遊戲結束 - 按重新開始','Game Over — tap Restart'));else logInfo(tl('存檔已載入','Save loaded'));}else{battleScreen.classList.remove('active');document.getElementById('map-container').style.display='flex';renderMap();ensureDungeonMoveAnchor();logInfo(tl('存檔已載入','Save loaded'));}}player.hp=clamp(player.hp,0,player.maxHp);renderAllPanels();updateStatusBar();updateButtons();updateDungeonLogUi();if(!inDungeon)switchToHomeView();else updateHomeViewState();if(!player.shopItems||player.shopItems.length===0||Date.now()>=player.shopRefreshTime){refreshShop();}startPlaytimeCounter();sealPlayerState();startAntiCheatWatchdog();ensureChatLazyInit();initVersionWatch();applyPendingOverloadPayment().catch(()=>{});}btnAtkMain.addEventListener('click',()=>queueAttack(true));btnAtkOff.addEventListener('click',()=>queueAttack(false));btnRestart.addEventListener('click',restartGame);document.querySelectorAll('.tab-btn[data-tab]').forEach(b=>b.addEventListener('click',()=>onTabBtnClick(b.dataset.tab)));const logSidebarTitleClick=document.getElementById('log-sidebar-title');if(logSidebarTitleClick&&!logSidebarTitleClick.__bound){logSidebarTitleClick.__bound=true;logSidebarTitleClick.addEventListener('click',()=>switchTab('log'));}document.getElementById('btn-dungeon').addEventListener('click',()=>{if(player.isPermanentlyDead){logInfo(tl('角色已永久死亡','Character permanently dead'));return;}if(inDungeon){logInfo(tl('已在地城中','Already inside a dungeon'));return;}renderDungeonAdventure();dungeonOverlay.style.display='flex';});const dungeonLoadMoreBtn=document.getElementById('dungeon-load-more');if(dungeonLoadMoreBtn&&!dungeonLoadMoreBtn.__bound){dungeonLoadMoreBtn.__bound=true;dungeonLoadMoreBtn.addEventListener('click',()=>{dungeonLoadMoreExtra++;renderDungeonAdventure(false);});}document.getElementById('btn-close-dungeon').addEventListener('click',()=>{dungeonOverlay.style.display='none';});dungeonOverlay.addEventListener('click',e=>{if(e.target===dungeonOverlay)dungeonOverlay.style.display='none';});document.getElementById('btn-close-difficulty').addEventListener('click',()=>{difficultyOverlay.style.display='none';});difficultyOverlay.addEventListener('click',e=>{if(e.target===difficultyOverlay)difficultyOverlay.style.display='none';});document.getElementById('talent-close').addEventListener('click',()=>{document.getElementById('talent-overlay').style.display='none';});function runBootSequence(){consumeVersionReloadParam();const overlay=document.getElementById('loading-overlay');const textEl=document.getElementById('loading-text');const barFill=document.getElementById('loading-bar-fill');if(textEl)textEl.textContent=t('loadingText');if(overlay)overlay.style.display='flex';if(barFill){barFill.style.animation='none';void barFill.offsetWidth;barFill.style.animation='';barFill.style.animationDuration='1.1s';}startServerWarmup();const finishBoot=()=>{if(overlay)overlay.classList.add('fade-out');setTimeout(()=>{if(overlay){overlay.style.display='none';overlay.classList.remove('fade-out');}continueGameBoot();},320);};setTimeout(finishBoot,900);}initCombatItemBar();setupAccountUI();setupVersionUI();setupLeaderboardUI();setupFloatHubUI();setupBugPipelineUI();runBootSequence();})();
+/* ═══════════════════════════════════════════════════════════════════════════
+   PET SYSTEM  –  v2.25.34
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+// ── Pet type definitions ────────────────────────────────────────────────────
+const PET_TYPES = [
+  // id, nameZh, nameEn, rarity, baseHp, baseAtk, baseDef, element, growthRate
+  {id:'fire_wolf',    nameZh:'炎狼',    nameEn:'Fire Wolf',    rarity:'rare',      baseHp:60,  baseAtk:12, baseDef:4,  elem:'火', grow:1.08},
+  {id:'ice_fox',     nameZh:'冰狐',    nameEn:'Ice Fox',      rarity:'rare',      baseHp:50,  baseAtk:10, baseDef:6,  elem:'冰', grow:1.07},
+  {id:'thunder_hawk',nameZh:'雷鷹',    nameEn:'Thunder Hawk', rarity:'epic',      baseHp:70,  baseAtk:15, baseDef:5,  elem:'雷', grow:1.10},
+  {id:'void_cat',    nameZh:'虛空貓',  nameEn:'Void Cat',     rarity:'epic',      baseHp:55,  baseAtk:18, baseDef:3,  elem:'暗', grow:1.12},
+  {id:'earth_bear',  nameZh:'大地熊',  nameEn:'Earth Bear',   rarity:'rare',      baseHp:90,  baseAtk:8,  baseDef:12, elem:'土', grow:1.06},
+  {id:'wind_rabbit', nameZh:'疾風兔',  nameEn:'Wind Rabbit',  rarity:'common',    baseHp:40,  baseAtk:8,  baseDef:3,  elem:'風', grow:1.05},
+  {id:'shadow_snake',nameZh:'暗影蛇',  nameEn:'Shadow Snake', rarity:'epic',      baseHp:65,  baseAtk:16, baseDef:7,  elem:'暗', grow:1.11},
+  {id:'holy_deer',   nameZh:'聖光鹿',  nameEn:'Holy Deer',    rarity:'legendary', baseHp:100, baseAtk:14, baseDef:14, elem:'光', grow:1.15},
+  {id:'magma_crab',  nameZh:'熔岩蟹',  nameEn:'Magma Crab',   rarity:'epic',      baseHp:80,  baseAtk:12, baseDef:16, elem:'火', grow:1.09},
+  {id:'storm_dragon',nameZh:'風暴龍',  nameEn:'Storm Dragon',  rarity:'legendary', baseHp:120, baseAtk:22, baseDef:10, elem:'雷', grow:1.18},
+];
+
+// Boss drop egg pool  (boss tier → possible type ids)
+const PET_EGG_POOLS = {
+  normal: ['wind_rabbit','fire_wolf','ice_fox','earth_bear'],
+  hard:   ['fire_wolf','ice_fox','thunder_hawk','void_cat','earth_bear','shadow_snake','magma_crab'],
+  hell:   ['thunder_hawk','void_cat','shadow_snake','holy_deer','magma_crab','storm_dragon'],
+};
+
+// CC effects for pet skills
+const PET_CC_EFFECTS = [
+  {id:'atk_debuff', label:'降傷', labelEn:'ATK Down',   chance:0.15, duration:2, apply:(e)=>{e._petAtkDebuff=(e._petAtkDebuff||1)*0.75;}},
+  {id:'def_debuff', label:'降防', labelEn:'DEF Down',   chance:0.15, duration:2, apply:(e)=>{e._petDefDebuff=(e._petDefDebuff||1)*0.70;}},
+  {id:'stun',       label:'暈眩', labelEn:'Stun',       chance:0.08, duration:1, apply:(e)=>{e._petStunTurns=(e._petStunTurns||0)+1;}},
+  {id:'blind',      label:'致盲', labelEn:'Blind',      chance:0.10, duration:2, apply:(e)=>{e._petBlindTurns=(e._petBlindTurns||0)+2;}},
+];
+
+const RARITY_COLORS_PET = {common:'#aaa',rare:'#5599ff',epic:'#cc55ff',legendary:'#ffcc00',hidden:'#ff66aa'};
+const PET_NPC_REVIVE_GOLD = [200, 500, 1200, 3000];  // cost tiers by rarity index
+const PET_AUTO_REVIVE_ROUNDS = 100;
+const PET_ATK_INTERVAL_MS = 3000;
+
+// ── Pet egg item ─────────────────────────────────────────────────────────────
+const PET_EGG_ITEM_ID = 'petEgg';
+
+// ── Pet stat computation ─────────────────────────────────────────────────────
+function getPetTypeDef(id){ return PET_TYPES.find(p=>p.id===id)||PET_TYPES[0]; }
+
+function calcPetStats(pet){
+  const def = getPetTypeDef(pet.typeId);
+  const lv  = Math.max(1, pet.level||1);
+  const g   = def.grow;
+  const hp  = Math.round(def.baseHp  * Math.pow(g, lv-1));
+  const atk = Math.round(def.baseAtk * Math.pow(g, lv-1));
+  const def2= Math.round(def.baseDef * Math.pow(g, lv-1));
+  return {maxHp:hp, atk, def:def2};
+}
+
+function getPetXpToNext(lv){ return Math.floor(30 * Math.pow(1.25, lv-1)); }
+
+function createPetFromType(typeId){
+  const def = getPetTypeDef(typeId);
+  const stats = calcPetStats({typeId, level:1});
+  return {
+    typeId, level:1, xp:0, xpToNext: getPetXpToNext(1),
+    hp: stats.maxHp, maxHp: stats.maxHp, atk: stats.atk, def: stats.def,
+    dead: false, deathCount: 0,
+    ccTurns: 0, ccType: null,
+    name: (typeof currentLang!=='undefined'&&currentLang==='zh') ? def.nameZh : def.nameEn,
+  };
+}
+
+// ── Pet XP & leveling ────────────────────────────────────────────────────────
+function addPetXp(xpAmt){
+  const pet = player.pet && player.pet.owned;
+  if(!pet||pet.dead) return;
+  pet.xp = (pet.xp||0) + xpAmt;
+  while(pet.xp >= pet.xpToNext && pet.level < 99){
+    pet.xp -= pet.xpToNext;
+    pet.level++;
+    pet.xpToNext = getPetXpToNext(pet.level);
+    const ns = calcPetStats(pet);
+    const oldMaxHp = pet.maxHp;
+    pet.maxHp = ns.maxHp; pet.atk = ns.atk; pet.def = ns.def;
+    const hpGain = ns.maxHp - oldMaxHp;
+    pet.hp = Math.min(pet.maxHp, pet.hp + hpGain);
+    const def = getPetTypeDef(pet.typeId);
+    const nm = (typeof currentLang!=='undefined'&&currentLang==='zh') ? def.nameZh : def.nameEn;
+    logInfo((typeof currentLang!=='undefined'&&currentLang==='zh')
+      ? `🐾 ${nm} 升至 Lv.${pet.level}！`
+      : `🐾 ${nm} reached Lv.${pet.level}!`);
+  }
+  renderPetPanel();
+}
+
+// ── Pet combat ───────────────────────────────────────────────────────────────
+let petAtkTimer = null;
+
+function startPetAtkTimer(){
+  clearPetAtkTimer();
+  petAtkTimer = setInterval(petAutoAttack, PET_ATK_INTERVAL_MS);
+}
+
+function clearPetAtkTimer(){
+  if(petAtkTimer){ clearInterval(petAtkTimer); petAtkTimer = null; }
+}
+
+function petAutoAttack(){
+  if(!inDungeon||!inCombat||!currentEnemy) return;
+  const pet = player.pet && player.pet.owned;
+  if(!pet||pet.dead) return;
+
+  // Check if enemy is stunned
+  if(currentEnemy._petStunTurns && currentEnemy._petStunTurns > 0){
+    currentEnemy._petStunTurns--;
+    const def = getPetTypeDef(pet.typeId);
+    const nm = (currentLang==='zh') ? def.nameZh : def.nameEn;
+    logInfo((currentLang==='zh') ? `🐾 ${nm} 的暈眩效果使敵人跳過行動！` : `🐾 ${nm}'s stun skips enemy turn!`);
+    return;
+  }
+
+  // Check if enemy is blind (40% miss)
+  if(currentEnemy._petBlindTurns && currentEnemy._petBlindTurns > 0){
+    currentEnemy._petBlindTurns--;
+  }
+
+  // Pet attacks
+  const atkMult = currentEnemy._petAtkDebuff || 1;
+  const enemyDef = Math.max(0, Math.round(currentEnemy.def * (currentEnemy._petDefDebuff||1)));
+  const rawDmg = Math.max(1, pet.atk - enemyDef);
+  const dmg = rawDmg;
+
+  currentEnemy.hp = Math.max(0, currentEnemy.hp - dmg);
+
+  // Try CC
+  let ccMsg = '';
+  for(const cc of PET_CC_EFFECTS){
+    if(Math.random() < cc.chance){
+      cc.apply(currentEnemy);
+      ccMsg = (currentLang==='zh') ? ` [${cc.label}]` : ` [${cc.labelEn}]`;
+      break;
+    }
+  }
+
+  const def2 = getPetTypeDef(pet.typeId);
+  const nm = (currentLang==='zh') ? def2.nameZh : def2.nameEn;
+  logInfo((currentLang==='zh')
+    ? `🐾 ${nm} 攻擊敵人造成 ${dmg} 傷害${ccMsg}`
+    : `🐾 ${nm} attacks for ${dmg} damage${ccMsg}`);
+
+  if(currentEnemy.hp <= 0){
+    // Pet delivers kill → loot goes to pet bag
+    const killedByPet = true;
+    handlePetKill(killedByPet);
+    return;
+  }
+
+  // Tick down debuff durations
+  if(currentEnemy._petAtkDebuffTurns !== undefined) currentEnemy._petAtkDebuffTurns--;
+  if(currentEnemy._petDefDebuffTurns !== undefined) currentEnemy._petDefDebuffTurns--;
+
+  updateBattleUI({full:false});
+  renderPetPanel();
+}
+
+function handlePetKill(killedByPet){
+  if(!currentEnemy) return;
+  const pet = player.pet && player.pet.owned;
+  // Give XP to pet
+  if(pet && !pet.dead){
+    const xpGain = Math.max(1, Math.floor((currentEnemy.xpReward||currentEnemy.xp||5) * 0.5));
+    addPetXp(xpGain);
+  }
+  // Clear CC state on enemy
+  delete currentEnemy._petAtkDebuff;
+  delete currentEnemy._petDefDebuff;
+  delete currentEnemy._petStunTurns;
+  delete currentEnemy._petBlindTurns;
+
+  // If pet killed, auto-loot to pet bag
+  if(killedByPet && pet && !pet.dead){
+    autolootToPetBag();
+  }
+
+  // Trigger normal kill routine
+  if(typeof killEnemy === 'function') killEnemy();
+}
+
+function autolootToPetBag(){
+  const petState = player.pet;
+  if(!petState || !Array.isArray(petState.bag)) return;
+  if(!currentEnemy) return;
+  // Try to put gold directly
+  const goldDrop = currentEnemy.goldDrop || currentEnemy.gold || 0;
+  if(goldDrop > 0){
+    if(petState.bag.length < petState.bagMax){
+      petState.bag.push({type:'gold', qty: goldDrop, ts: Date.now()});
+      const pet = petState.owned;
+      const def = pet ? getPetTypeDef(pet.typeId) : null;
+      const nm = def ? ((currentLang==='zh')?def.nameZh:def.nameEn) : '寵物';
+      logInfo((currentLang==='zh')
+        ? `🐾 ${nm} 自動拾取了 ${goldDrop} 金幣 → 寵物背包`
+        : `🐾 ${nm} auto-looted ${goldDrop} gold → pet bag`);
+    }
+  }
+  renderPetBagOverlay();
+}
+
+// ── Pet receives damage (called from enemy attack logic) ─────────────────────
+function petTakeDamage(dmg){
+  const pet = player.pet && player.pet.owned;
+  if(!pet||pet.dead) return;
+  const reduced = Math.max(1, dmg - pet.def);
+  pet.hp = Math.max(0, pet.hp - reduced);
+  if(pet.hp <= 0){
+    pet.dead = true;
+    pet.hp = 0;
+    pet.deathCount = (pet.deathCount||0) + 1;
+    const def = getPetTypeDef(pet.typeId);
+    const nm = (currentLang==='zh') ? def.nameZh : def.nameEn;
+    logInfo((currentLang==='zh')
+      ? `💀 ${nm} 陣亡了！`
+      : `💀 ${nm} has fallen!`);
+    clearPetAtkTimer();
+    showPetReviveOverlay();
+  }
+  renderPetPanel();
+}
+
+// ── Joint combat: player acts → pet acts → enemy acts ───────────────────────
+// This is called after the player attack completes in the normal combat queue.
+// We hook in by patching the enemy turn to also check lowest-HP target.
+function petJointCombatTurn(){
+  if(!inCombat||!currentEnemy||currentEnemy.hp<=0) return;
+  petAutoAttack();
+}
+
+// ── Dungeon round counting & auto-revive ─────────────────────────────────────
+function onPetDungeonRound(){
+  if(!player.pet) return;
+  player.pet.dungeonRounds = (player.pet.dungeonRounds||0) + 1;
+  const pet = player.pet.owned;
+  if(!pet) return;
+  if(pet.dead){
+    player.pet.reviveRoundsAccum = (player.pet.reviveRoundsAccum||0) + 1;
+    if(player.pet.reviveRoundsAccum >= PET_AUTO_REVIVE_ROUNDS){
+      player.pet.reviveRoundsAccum = 0;
+      revivePet(true);
+    }
+  }
+}
+
+// ── Pet revive ───────────────────────────────────────────────────────────────
+function revivePet(auto){
+  const pet = player.pet && player.pet.owned;
+  if(!pet) return;
+  const def = getPetTypeDef(pet.typeId);
+  const nm = (currentLang==='zh') ? def.nameZh : def.nameEn;
+  const stats = calcPetStats(pet);
+  pet.hp = Math.round(stats.maxHp * 0.3);
+  pet.dead = false;
+  if(auto){
+    logInfo((currentLang==='zh')
+      ? `🌟 ${nm} 在100回合後自動復活，恢復了30% HP！`
+      : `🌟 ${nm} auto-revived after 100 rounds with 30% HP!`);
+  } else {
+    logInfo((currentLang==='zh')
+      ? `💊 ${nm} 已被復活！`
+      : `💊 ${nm} has been revived!`);
+  }
+  if(inDungeon && inCombat) startPetAtkTimer();
+  renderPetPanel();
+  closePetReviveOverlay();
+  throttleSave();
+}
+
+function revivePetNpc(){
+  const pet = player.pet && player.pet.owned;
+  if(!pet||!pet.dead) return;
+  const def = getPetTypeDef(pet.typeId);
+  const rarityIdx = {common:0, rare:1, epic:2, legendary:3}[def.rarity]||0;
+  const cost = PET_NPC_REVIVE_GOLD[rarityIdx]||200;
+  if(player.gold < cost){
+    logInfo((currentLang==='zh')
+      ? `金幣不足！需要 ${cost} 金幣復活寵物`
+      : `Not enough gold! Need ${cost} gold to revive pet`);
+    return;
+  }
+  player.gold -= cost;
+  revivePet(false);
+  updateStatusBar();
+  throttleSave();
+}
+
+// ── Hatch a pet egg ──────────────────────────────────────────────────────────
+function hatchPetEgg(eggSlot){
+  const petState = player.pet;
+  if(!petState) return;
+  if(petState.owned){
+    logInfo((currentLang==='zh')
+      ? '你已有一隻寵物！請先放棄現有寵物才能孵化新蛋。'
+      : 'You already have a pet! Release it first to hatch a new egg.');
+    return;
+  }
+  const egg = petState.bag[eggSlot];
+  if(!egg || egg.type!=='egg') return;
+  const pet = createPetFromType(egg.typeId);
+  const def = getPetTypeDef(egg.typeId);
+  const nm = (currentLang==='zh') ? def.nameZh : def.nameEn;
+  petState.owned = pet;
+  petState.bag.splice(eggSlot, 1);
+  petState.carrying = false;
+  logInfo((currentLang==='zh')
+    ? `🥚 蛋孵化了！獲得了 [${nm}]！`
+    : `🥚 The egg hatched! You got [${nm}]!`);
+  renderPetPanel();
+  renderPetBagOverlay();
+  throttleSave();
+}
+
+// ── Drop pet egg from boss ───────────────────────────────────────────────────
+function tryDropPetEgg(tier){
+  const pool = PET_EGG_POOLS[tier] || PET_EGG_POOLS.normal;
+  const typeId = pool[Math.floor(Math.random()*pool.length)];
+  const def = getPetTypeDef(typeId);
+  const petState = player.pet;
+  if(!petState || !Array.isArray(petState.bag)) return;
+  if(petState.bag.length >= petState.bagMax){
+    logInfo((currentLang==='zh')
+      ? '💥 BOSS 掉落了寵物蛋，但寵物背包已滿！'
+      : '💥 BOSS dropped a pet egg, but the pet bag is full!');
+    return;
+  }
+  const rarityColor = RARITY_COLORS_PET[def.rarity]||'#aaa';
+  petState.bag.push({type:'egg', typeId, ts: Date.now()});
+  const nm = (currentLang==='zh') ? def.nameZh : def.nameEn;
+  logInfo((currentLang==='zh')
+    ? `🥚 BOSS 掉落了 [${nm}] 的寵物蛋 → 寵物背包`
+    : `🥚 BOSS dropped a [${nm}] pet egg → pet bag`);
+  renderPetPanel();
+  throttleSave();
+}
+
+// ── Pet panel HTML renderer ──────────────────────────────────────────────────
+function grantDevPetEggs(){
+  if(typeof isDevAccount !== 'function' || !isDevAccount()) return 0;
+  const st = player && player.pet;
+  if(!st) return 0;
+  if(!Array.isArray(st.bag)) st.bag = [];
+  const ALL_TYPES = PET_TYPES.map(p=>p.id);
+  const now = Date.now();
+  let added = 0;
+  ALL_TYPES.forEach((typeId, i)=>{
+    const already = st.bag.some(e=>e.type==='egg' && e.typeId===typeId);
+    if(!already && st.bag.length < PET_BAG_MAX){
+      st.bag.push({type:'egg', typeId, ts: now + i});
+      added++;
+    }
+  });
+  if(added > 0 && typeof throttleSave === 'function') throttleSave();
+  return added;
+}
+
+function renderPetPanel(){
+  const body = document.getElementById('pet-panel-body');
+  if(!body) return;
+  const titleEl = document.getElementById('pet-panel-title');
+  if(titleEl) titleEl.textContent = (currentLang==='zh') ? '🐾 寵物' : '🐾 Pet';
+
+  // Dev account: always ensure all egg types are present before rendering
+  grantDevPetEggs();
+
+  const petState = player && player.pet;
+  if(!petState){
+    body.innerHTML = '<div style="color:#666;font-size:0.6rem;padding:0.5rem;">寵物系統未初始化</div>';
+    return;
+  }
+  const pet = petState.owned;
+  if(!pet){
+    const bagCount = (petState.bag||[]).filter(e=>e.type==='egg').length;
+    body.innerHTML = `
+      <div style="text-align:center;padding:1rem;color:#888;font-size:0.65rem;">
+        <div style="font-size:1.4rem;margin-bottom:0.5rem;">🥚</div>
+        <div>${currentLang==='zh'?'尚無寵物':'No pet yet'}</div>
+        <div style="margin-top:0.3rem;color:#666;font-size:0.55rem;">${currentLang==='zh'?`寵物背包有 ${bagCount} 顆蛋`:`${bagCount} egg(s) in pet bag`}</div>
+        ${bagCount>0?`<button onclick="showPetBagOverlay()" style="margin-top:0.6rem;background:#1a1a2e;border:1px solid #5599ff;color:#88aaff;font-size:0.6rem;padding:0.3rem 0.8rem;cursor:pointer;border-radius:4px;">${currentLang==='zh'?'開啟背包孵化':'Open bag to hatch'}</button>`:''}
+        <div style="margin-top:0.8rem;color:#555;font-size:0.5rem;">${currentLang==='zh'?'擊敗地城BOSS可獲得寵物蛋':'Defeat dungeon bosses to get pet eggs'}</div>
+      </div>`;
+    return;
+  }
+
+  const def = getPetTypeDef(pet.typeId);
+  const nm = (currentLang==='zh') ? def.nameZh : def.nameEn;
+  const rc = RARITY_COLORS_PET[def.rarity]||'#aaa';
+  const rarityLabel = {common:currentLang==='zh'?'普通':'Common',rare:currentLang==='zh'?'稀有':'Rare',epic:currentLang==='zh'?'史詩':'Epic',legendary:currentLang==='zh'?'傳說':'Legendary'}[def.rarity]||def.rarity;
+  const hpPct = pet.maxHp>0 ? Math.max(0,Math.min(100,Math.round(pet.hp/pet.maxHp*100))) : 0;
+  const xpPct = pet.xpToNext>0 ? Math.max(0,Math.min(100,Math.round((pet.xp||0)/pet.xpToNext*100))) : 0;
+  const autoRounds = petState.reviveRoundsAccum||0;
+  const bagCount = (petState.bag||[]).length;
+
+  let html = `
+    <div style="background:#141420;border:1px solid ${rc}44;border-radius:6px;padding:0.5rem;margin-bottom:0.5rem;">
+      <div style="display:flex;align-items:center;gap:0.4rem;margin-bottom:0.3rem;">
+        <span style="font-size:1.2rem;">${def.elem||'⚡'}</span>
+        <div>
+          <div style="color:${rc};font-weight:bold;font-size:0.7rem;">${nm}</div>
+          <div style="color:#888;font-size:0.5rem;">[${rarityLabel}] ${def.elem||''} Lv.${pet.level}</div>
+        </div>
+        <div style="margin-left:auto;text-align:right;">
+          ${pet.dead ? `<span style="color:#ff4444;font-size:0.6rem;font-weight:bold;">💀 ${currentLang==='zh'?'陣亡':'DEAD'}</span>` :
+            `<span style="color:#88ff88;font-size:0.55rem;">● ${currentLang==='zh'?'存活':'Alive'}</span>`}
+        </div>
+      </div>`;
+
+  if(!pet.dead){
+    html += `
+      <div style="margin-bottom:0.2rem;">
+        <div style="display:flex;justify-content:space-between;font-size:0.5rem;color:#aaa;margin-bottom:0.1rem;">
+          <span>HP</span><span>${pet.hp}/${pet.maxHp}</span>
+        </div>
+        <div style="background:#2a2a2a;border-radius:3px;height:6px;overflow:hidden;">
+          <div style="width:${hpPct}%;height:100%;background:${hpPct>50?'#44aa44':hpPct>20?'#aaaa22':'#aa2222'};transition:width 0.3s;"></div>
+        </div>
+      </div>
+      <div style="margin-bottom:0.3rem;">
+        <div style="display:flex;justify-content:space-between;font-size:0.5rem;color:#aaa;margin-bottom:0.1rem;">
+          <span>XP</span><span>${pet.xp||0}/${pet.xpToNext}</span>
+        </div>
+        <div style="background:#2a2a2a;border-radius:3px;height:4px;overflow:hidden;">
+          <div style="width:${xpPct}%;height:100%;background:#6666ff;transition:width 0.3s;"></div>
+        </div>
+      </div>`;
+  } else {
+    html += `
+      <div style="color:#ff6666;font-size:0.55rem;margin:0.3rem 0;">
+        ${currentLang==='zh'?`自動復活進度：${autoRounds}/${PET_AUTO_REVIVE_ROUNDS} 回合`:`Auto-revive: ${autoRounds}/${PET_AUTO_REVIVE_ROUNDS} rounds`}
+      </div>
+      <button onclick="showPetReviveOverlay()" style="width:100%;background:#2a1a1a;border:1px solid #aa4444;color:#ffaaaa;font-size:0.6rem;padding:0.3rem;cursor:pointer;border-radius:4px;margin-bottom:0.3rem;">
+        💊 ${currentLang==='zh'?'立即復活（花費金幣）':'Revive Now (spend gold)'}
+      </button>`;
+  }
+
+  html += `
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.2rem;font-size:0.5rem;color:#bbb;text-align:center;margin-top:0.2rem;">
+        <div style="background:#1a1a28;padding:0.2rem;border-radius:3px;"><div style="color:#ff8888;">ATK</div><div>${pet.atk}</div></div>
+        <div style="background:#1a1a28;padding:0.2rem;border-radius:3px;"><div style="color:#88aaff;">DEF</div><div>${pet.def}</div></div>
+        <div style="background:#1a1a28;padding:0.2rem;border-radius:3px;"><div style="color:#aaa;">${currentLang==='zh'?'死亡次數':'Deaths'}</div><div>${pet.deathCount||0}</div></div>
+      </div>
+    </div>`;
+
+  html += `
+    <div style="font-size:0.55rem;color:#666;margin-bottom:0.3rem;">
+      ${currentLang==='zh'?`寵物背包：${bagCount}/${petState.bagMax} 格`:`Pet bag: ${bagCount}/${petState.bagMax} slots`}
+    </div>`;
+
+  // Carry toggle
+  html += `
+    <div style="display:flex;gap:0.4rem;margin-top:0.3rem;">
+      <button onclick="togglePetCarry()" style="flex:1;background:${petState.carrying?'#1a2a1a':'#1a1a2a'};border:1px solid ${petState.carrying?'#44aa44':'#4466aa'};color:${petState.carrying?'#88ff88':'#88aaff'};font-size:0.55rem;padding:0.3rem;cursor:pointer;border-radius:4px;">
+        ${petState.carrying?(currentLang==='zh'?'🐾 帶入地城（開）':'🐾 Carry to Dungeon (ON)'):(currentLang==='zh'?'🐾 帶入地城（關）':'🐾 Carry to Dungeon (OFF)')}
+      </button>
+    </div>`;
+
+  body.innerHTML = html;
+}
+
+function togglePetCarry(){
+  if(!player.pet) return;
+  const pet = player.pet.owned;
+  if(!pet){ logInfo(currentLang==='zh'?'尚無寵物':'No pet yet'); return; }
+  player.pet.carrying = !player.pet.carrying;
+  logInfo(player.pet.carrying
+    ? (currentLang==='zh'?'🐾 寵物將隨你進入地城':'🐾 Pet will accompany you into dungeons')
+    : (currentLang==='zh'?'🐾 寵物將留在城鎮':'🐾 Pet will stay in town'));
+  renderPetPanel();
+  throttleSave();
+}
+
+// ── Pet bag overlay ──────────────────────────────────────────────────────────
+function showPetBagOverlay(){
+  renderPetBagOverlay();
+  const el = document.getElementById('pet-bag-overlay');
+  if(el) el.style.display='flex';
+}
+
+function closePetBagOverlay(){
+  const el = document.getElementById('pet-bag-overlay');
+  if(el) el.style.display='none';
+}
+
+function renderPetBagOverlay(){
+  const body = document.getElementById('pet-bag-body');
+  if(!body) return;
+  const petState = player && player.pet;
+  if(!petState || !Array.isArray(petState.bag)){
+    body.innerHTML = '<div style="color:#666;font-size:0.6rem;">背包空的</div>';
+    return;
+  }
+  if(petState.bag.length===0){
+    body.innerHTML = `<div style="color:#666;font-size:0.6rem;text-align:center;padding:1rem;">${currentLang==='zh'?'背包是空的':'Bag is empty'}</div>`;
+    return;
+  }
+  let html = '';
+  petState.bag.forEach((item, idx)=>{
+    if(item.type==='egg'){
+      const def = getPetTypeDef(item.typeId);
+      const nm = (currentLang==='zh') ? def.nameZh : def.nameEn;
+      const rc = RARITY_COLORS_PET[def.rarity]||'#aaa';
+      const rarityLabel = {common:currentLang==='zh'?'普通':'Common',rare:currentLang==='zh'?'稀有':'Rare',epic:currentLang==='zh'?'史詩':'Epic',legendary:currentLang==='zh'?'傳說':'Legendary'}[def.rarity]||def.rarity;
+      html += `
+        <div style="background:#141420;border:1px solid ${rc}44;border-radius:5px;padding:0.4rem 0.5rem;margin-bottom:0.3rem;display:flex;align-items:center;gap:0.4rem;">
+          <span style="font-size:1rem;">🥚</span>
+          <div style="flex:1;">
+            <div style="color:${rc};font-size:0.65rem;font-weight:bold;">${nm}</div>
+            <div style="color:#888;font-size:0.5rem;">[${rarityLabel}] ${def.elem||''}</div>
+          </div>
+          ${!petState.owned?`<button onclick="closePetBagOverlay();hatchPetEgg(${idx});" style="background:#1a2a1a;border:1px solid #44aa44;color:#88ff88;font-size:0.55rem;padding:0.2rem 0.4rem;cursor:pointer;border-radius:4px;">${currentLang==='zh'?'孵化':'Hatch'}</button>`:''}
+        </div>`;
+    } else if(item.type==='gold'){
+      html += `
+        <div style="background:#141420;border:1px solid #cc9922;border-radius:5px;padding:0.4rem 0.5rem;margin-bottom:0.3rem;display:flex;align-items:center;gap:0.4rem;">
+          <span style="font-size:1rem;">💰</span>
+          <div style="flex:1;">
+            <div style="color:#ffcc44;font-size:0.65rem;">${currentLang==='zh'?'金幣':'Gold'} x${item.qty}</div>
+          </div>
+          <button onclick="claimPetBagGold(${idx})" style="background:#1a2a1a;border:1px solid #cc9922;color:#ffcc44;font-size:0.55rem;padding:0.2rem 0.4rem;cursor:pointer;border-radius:4px;">${currentLang==='zh'?'領取':'Claim'}</button>
+        </div>`;
+    }
+  });
+  body.innerHTML = html;
+}
+
+function claimPetBagGold(idx){
+  const petState = player && player.pet;
+  if(!petState || !Array.isArray(petState.bag)) return;
+  const item = petState.bag[idx];
+  if(!item || item.type!=='gold') return;
+  player.gold = (player.gold||0) + (item.qty||0);
+  petState.bag.splice(idx, 1);
+  logInfo((currentLang==='zh')
+    ? `💰 從寵物背包領取了 ${item.qty} 金幣`
+    : `💰 Claimed ${item.qty} gold from pet bag`);
+  updateStatusBar();
+  renderPetBagOverlay();
+  renderPetPanel();
+  throttleSave();
+}
+
+// ── Pet revive overlay ───────────────────────────────────────────────────────
+function showPetReviveOverlay(){
+  const pet = player.pet && player.pet.owned;
+  if(!pet||!pet.dead) return;
+  const def = getPetTypeDef(pet.typeId);
+  const rarityIdx = {common:0,rare:1,epic:2,legendary:3}[def.rarity]||0;
+  const cost = PET_NPC_REVIVE_GOLD[rarityIdx]||200;
+  const nm = (currentLang==='zh') ? def.nameZh : def.nameEn;
+  const body = document.getElementById('pet-revive-body');
+  if(body) body.textContent = (currentLang==='zh')
+    ? `${nm} 在戰鬥中陣亡了。\n自動復活需 ${PET_AUTO_REVIVE_ROUNDS} 回合地城。`
+    : `${nm} fell in battle.\nAuto-revive in ${PET_AUTO_REVIVE_ROUNDS} dungeon rounds.`;
+  const btn = document.getElementById('pet-revive-npc-btn');
+  if(btn) btn.textContent = (currentLang==='zh')
+    ? `花費 ${cost} 金幣立即復活`
+    : `Spend ${cost} gold to revive`;
+  const hint = document.getElementById('pet-revive-auto-hint');
+  const accum = player.pet.reviveRoundsAccum||0;
+  if(hint) hint.textContent = (currentLang==='zh')
+    ? `距自動復活還需 ${PET_AUTO_REVIVE_ROUNDS-accum} 回合`
+    : `Auto-revive in ${PET_AUTO_REVIVE_ROUNDS-accum} more rounds`;
+  const el = document.getElementById('pet-revive-overlay');
+  if(el) el.style.display='flex';
+}
+
+function closePetReviveOverlay(){
+  const el = document.getElementById('pet-revive-overlay');
+  if(el) el.style.display='none';
+}
+
+// ── Hook into dungeon/boss events ────────────────────────────────────────────
+// Patch killEnemy to drop pet egg on boss kills
+const _origKillEnemy = typeof killEnemy === 'function' ? killEnemy : null;
+
+// We monkey-patch by wrapping after the main file loads.
+// Since pet JS loads after inline script, killEnemy is defined by now.
+(function patchKillEnemyForPet(){
+  if(typeof killEnemy !== 'function') return;
+  const _orig = killEnemy;
+  window.killEnemy = function(){
+    const wasBoss = currentEnemy && currentEnemy.isBoss;
+    const tier = currentDungeon && currentDungeon.tier;
+    // Give pet XP on any kill
+    if(currentEnemy && !currentEnemy.hp <= 0){ /* not already dead */ }
+    const petSt = player && player.pet;
+    if(currentEnemy && petSt && petSt.owned && !petSt.owned.dead){
+      const xpG = Math.max(1, Math.floor((currentEnemy.xpReward||currentEnemy.xp||5)*0.3));
+      addPetXp(xpG);
+    }
+    _orig.apply(this, arguments);
+    if(wasBoss && petSt && Math.random() < 0.35){
+      tryDropPetEgg(tier||'normal');
+    }
+  };
+})();
+
+// Patch monstersRemaining decrement to count dungeon rounds for pet
+(function patchDungeonRoundForPet(){
+  // We hook onto the map move / monster kill cycle via a MutationObserver on the log
+  // to count rounds. Simpler: hook enterDungeonNextFloor and after each kill.
+  const _checkRound = () => { if(typeof onPetDungeonRound==='function') onPetDungeonRound(); };
+  // Attach to the normal combat end: after player completes a turn
+  const _origProcessNext = typeof processNextAttack === 'function' ? processNextAttack : null;
+  if(typeof processNextAttack === 'function'){
+    const __orig = processNextAttack;
+    window.processNextAttack = function(){
+      __orig.apply(this, arguments);
+    };
+  }
+})();
+
+// Patch enterDungeon to start pet timer
+(function patchEnterDungeonForPet(){
+  if(typeof enterDungeon !== 'function') return;
+  const _orig = enterDungeon;
+  window.enterDungeon = function(){
+    _orig.apply(this, arguments);
+    const petSt = player && player.pet;
+    if(petSt && petSt.carrying && petSt.owned && !petSt.owned.dead){
+      startPetAtkTimer();
+    }
+  };
+})();
+
+// Patch leaveDungeon / exitDungeon to stop pet timer
+(function patchExitDungeonForPet(){
+  ['leaveDungeon','exitDungeon','playerEscapeDungeon'].forEach(fn=>{
+    if(typeof window[fn] !== 'function') return;
+    const _orig = window[fn];
+    window[fn] = function(){
+      clearPetAtkTimer();
+      _orig.apply(this, arguments);
+    };
+  });
+})();
+
+// Patch startCombat to start/stop pet timer based on carry state
+(function patchCombatForPet(){
+  if(typeof startCombat !== 'function') return;
+  const _orig = startCombat;
+  window.startCombat = function(){
+    _orig.apply(this, arguments);
+    const petSt = player && player.pet;
+    if(petSt && petSt.carrying && petSt.owned && !petSt.owned.dead){
+      startPetAtkTimer();
+    }
+  };
+  if(typeof endCombat === 'function'){
+    const _origEnd = endCombat;
+    window.endCombat = function(){
+      clearPetAtkTimer();
+      _origEnd.apply(this, arguments);
+    };
+  }
+})();
+
+// Close overlays on background tap
+document.addEventListener('DOMContentLoaded', ()=>{}, false);
+(function setupPetOverlayDismiss(){
+  const bagOv = document.getElementById('pet-bag-overlay');
+  if(bagOv) bagOv.addEventListener('click', e=>{ if(e.target===bagOv) closePetBagOverlay(); });
+  const revOv = document.getElementById('pet-revive-overlay');
+  if(revOv) revOv.addEventListener('click', e=>{ if(e.target===revOv) closePetReviveOverlay(); });
+})();
+
+// Pet panel CSS panel show/hide  
+(function ensurePetPanelCss(){
+  const style = document.createElement('style');
+  style.textContent = `
+    #pet-panel { display:none; flex-direction:column; overflow:hidden; }
+    #pet-panel.show { display:flex !important; }
+    #pet-panel-body { scrollbar-width:thin; scrollbar-color:#333 #111; }
+  `;
+  document.head.appendChild(style);
+})();
+
+// ── Dev-account pet egg grant ─────────────────────────────────────────────────
+// grantDevPetEggs() is defined in renderPetPanel section above.
+// Also run it on window load (after full game init) and after any login events.
+window.addEventListener('load', function(){
+  setTimeout(function(){
+    const n = grantDevPetEggs();
+    if(n > 0) console.log('[PET SYSTEM] Dev eggs granted on load:', n);
+  }, 800);
+});
+
+console.log('[PET SYSTEM] v2.25.37 loaded');
+/* ═══════════════════════════════ END PET SYSTEM ═══════════════════════════ */
+
+</script>
 <div id="pet-panel" class="panel" style="display:none;">
   <div class="panel-header" style="display:flex;align-items:center;justify-content:space-between;padding:0.4rem 0.6rem;border-bottom:1px solid #2a2a2a;">
     <span id="pet-panel-title" style="font-weight:bold;color:#e0c97f;font-size:0.7rem;">🐾 寵物</span>
